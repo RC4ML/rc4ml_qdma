@@ -1,6 +1,5 @@
 #include "QDMAController.h"
-
-#include <cstdint>
+#include "QDMAController.hpp"
 
 #include <map>
 #include <string>
@@ -14,6 +13,13 @@
 #include <fmt/ostream.h>
 #include <fmt/std.h>	
 #include <fmt/color.h>
+
+#include <sys/mman.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <immintrin.h>
+
+#include <rc4ml.h>
 
 struct Bars{
 	volatile uint32_t *config_bar;
@@ -31,19 +37,19 @@ std::map<char,Bars> device_list;
 int num_device=0;
 unsigned char default_pci_bus=0;
 
-auto getSysPathBarName(uint8_t bus_id, uint8_t dev_id, uint8_t func_id, uint8_t bar_id) {
+static auto getSysPathBarName(uint8_t bus_id, uint8_t dev_id, uint8_t func_id, uint8_t bar_id) {
 	return fmt::format("/sys/bus/pci/devices/0000:{:02x}:{:02x}.{:x}/resource{}", bus_id, dev_id, func_id, bar_id);
 }
 
-void errorPrint(std::string_view str){
+static void errorPrint(std::string_view str){
 	fmt::print(fg(fmt::color::red), "{}\n", str);
 }
 
-void passPrint(std::string_view str){
+static void passPrint(std::string_view str){
 	fmt::print(fg(fmt::color::green), "{}\n", str);
 }
 
-void warnPrint(std::string_view str){
+static void warnPrint(std::string_view str){
 	fmt::print(fg(fmt::color::yellow), "{}\n", str);
 }
 
@@ -57,7 +63,7 @@ unsigned char get_pci_bus(unsigned char pci_bus){
 	}
 	return pci_bus;
 }
-
+extern "C" {
 void init(unsigned char pci_bus, size_t bridge_bar_size){
 	passPrint(fmt::format("Init pci dev: 0x{:#x}",pci_bus));
 	if(device_list.count(pci_bus) != 0){
@@ -276,4 +282,6 @@ void printCounters(unsigned char pci_bus){
 	warnPrint(fmt::format("{} Report 10:fifo_h2c_data.io.in.ready", ((axi_lite[512+16]>>10) & 1)));
 
 	fmt::print("\n");
+}
+
 }

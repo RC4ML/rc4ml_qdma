@@ -14,6 +14,7 @@ set(SOURCE_FILES
 
 set(HEAD_FILES 
 	QDMAController.h
+	QDMAController.hpp
 )
 
 add_library(qdma SHARED ${SOURCE_FILES})
