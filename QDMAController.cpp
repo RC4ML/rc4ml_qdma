@@ -49,10 +49,10 @@ static const size_t config_region_size = 256*1024;
 static const size_t lite_region_size = 4*1024;
 static const size_t bridge_region_size = 1024*1024*1024;
 
-static std::map<uint8_t, std::shared_ptr<FPGAController>> device_list;
+static std::map<uint8_t, std::shared_ptr<FPGACtl>> device_list;
 
-FPGAController::FPGAController(uint8_t pci_bus,
-                               size_t bridge_bar_size):pci_bus(pci_bus),
+FPGACtl::FPGACtl(uint8_t pci_bus,
+                 size_t bridge_bar_size):pci_bus(pci_bus),
                                bridge_bar_size(bridge_bar_size) {
     passPrint(fmt::format(
             "Init pci dev: 0x{:#x}",pci_bus));
@@ -115,7 +115,7 @@ FPGAController::FPGAController(uint8_t pci_bus,
     }
 }
 
-FPGAController::~FPGAController() {
+FPGACtl::~FPGACtl() {
     if(munmap((void *) config_bar, config_region_size)==-1) {
         warnPrint(fmt::format("Unmap config bar failed"));
     }
@@ -127,92 +127,92 @@ FPGAController::~FPGAController() {
     }
 }
 
-void FPGAController::explictInit(uint8_t pci_bus, size_t bridge_bar_size) {
+void FPGACtl::explictInit(uint8_t pci_bus, size_t bridge_bar_size) {
     if(device_list.find(pci_bus)==device_list.end()) {
-        auto *tmp = new FPGAController(pci_bus, bridge_bar_size);
-        device_list[pci_bus] = std::shared_ptr<FPGAController>(tmp);
+        auto *tmp = new FPGACtl(pci_bus, bridge_bar_size);
+        device_list[pci_bus] = std::shared_ptr<FPGACtl>(tmp);
     } else {
         warnPrint(fmt::format("Device {:#x} has been initialized", pci_bus));
     }
 }
 
-FPGAController *FPGAController::getInstance(uint8_t pci_bus) {
+FPGACtl *FPGACtl::getInstance(uint8_t pci_bus) {
     if(device_list.find(pci_bus) == device_list.end()) {
         warnPrint(fmt::format("Device {:#x} will be initialized with default Bridge Bar Size {}", pci_bus, bridge_region_size));
-        auto *tmp = new FPGAController(pci_bus, bridge_region_size);
-        device_list[pci_bus] = std::shared_ptr<FPGAController>(tmp);
+        auto *tmp = new FPGACtl(pci_bus, bridge_region_size);
+        device_list[pci_bus] = std::shared_ptr<FPGACtl>(tmp);
     }
     return device_list[pci_bus].get();
 }
 
-void FPGAController::writeConfig(uint32_t index, uint32_t value) {
+void FPGACtl::writeConfig(uint32_t index, uint32_t value) {
     config_bar[index] = value;
 }
 
-uint32_t FPGAController::readConfig(uint32_t index) {
+uint32_t FPGACtl::readConfig(uint32_t index) {
     return config_bar[index];
 }
 
-void FPGAController::writeReg(uint32_t index, uint32_t value) {
+void FPGACtl::writeReg(uint32_t index, uint32_t value) {
     lite_bar[index] = value;
 }
 
-uint32_t FPGAController::readReg(uint32_t index) {
+uint32_t FPGACtl::readReg(uint32_t index) {
     return lite_bar[index];
 }
 
-void FPGAController::writeBridge(uint32_t index, const std::array<uint64_t, 8> &value) {
+void FPGACtl::writeBridge(uint32_t index, const std::array<uint64_t, 8> &value) {
     auto avx_reg = _mm512_loadu_epi64(value.data());
     _mm512_stream_si512((__m512i *)(bridge_bar + index), avx_reg);
 }
 
-std::array<uint64_t, 8> FPGAController::readBridge(uint32_t index) {
+std::array<uint64_t, 8> FPGACtl::readBridge(uint32_t index) {
     auto avx_reg = _mm512_stream_load_si512((void*)(bridge_bar + index));
     alignas(64) std::array<uint64_t, 8> ret;
     _mm512_store_epi64(ret.data(), avx_reg);
     return ret;
 }
 
-void FPGAController::writeBridge(uint32_t index, uint64_t *value) {
+void FPGACtl::writeBridge(uint32_t index, uint64_t *value) {
     auto avx_reg = _mm512_loadu_epi64(value);
     _mm512_stream_si512((__m512i *)(bridge_bar + index), avx_reg);
 }
 
-void FPGAController::readBridge(uint32_t index, uint64_t *value) {
+void FPGACtl::readBridge(uint32_t index, uint64_t *value) {
     auto avx_reg = _mm512_stream_load_si512((void*)(bridge_bar + index));
     _mm512_storeu_epi64(value, avx_reg);
 }
 
-void FPGAController::writeBridgeAligned(uint32_t index, uint64_t *value) {
+void FPGACtl::writeBridgeAligned(uint32_t index, uint64_t *value) {
     auto avx_reg = _mm512_load_epi64(value);
     _mm512_stream_si512((__m512i *)(bridge_bar + index), avx_reg);
 }
 
-void FPGAController::readBridgeAligned(uint32_t index, uint64_t *value) {
+void FPGACtl::readBridgeAligned(uint32_t index, uint64_t *value) {
     auto avx_reg = _mm512_stream_load_si512((void*)(bridge_bar + index));
     _mm512_store_epi64(value, avx_reg);
 }
 
-void *FPGAController::getBridgeAddr() {
+void *FPGACtl::getBridgeAddr() {
     return (void*)bridge_bar;
 }
 
-void *FPGAController::getLiteAddr() {
+void *FPGACtl::getLiteAddr() {
     return (void*)lite_bar;
 }
 
-void FPGAController::enableDebug() {
+void FPGACtl::enableDebug() {
     debug_flag = true;
 }
 
-void FPGAController::disableDebug() {
+void FPGACtl::disableDebug() {
     debug_flag = false;
 }
 
 extern "C" {
 
 void init(uint8_t pci_bus, size_t bridge_bar_size){
-    FPGAController::explictInit(pci_bus, bridge_bar_size);
+    FPGACtl::explictInit(pci_bus, bridge_bar_size);
 }
 
 void* qdmaCPUAlloc(size_t size, uint8_t pci_bus){
@@ -306,10 +306,10 @@ void* getLiteAddr(uint8_t pci_bus){
 }
 
 void enableDebug() {
-    FPGAController::enableDebug();
+    FPGACtl::enableDebug();
 }
 void disableDebug(){
-    FPGAController::disableDebug();
+    FPGACtl::disableDebug();
 }
 
 } // extern "C"

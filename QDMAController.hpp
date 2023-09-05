@@ -6,14 +6,14 @@
 #include <cstdint>
 #include <immintrin.h>
 
-class FPGAController{
+class FPGACtl{
 protected:
-	FPGAController(uint8_t pci_bus, size_t bridge_bar_size);
+	FPGACtl(uint8_t pci_bus, size_t bridge_bar_size);
 public:
-	~FPGAController();
+	~FPGACtl();
 
 	static void explictInit(uint8_t pci_bus, size_t bridge_bar_size);
-	static FPGAController* getInstance(uint8_t pci_bus);
+	static FPGACtl* getInstance(uint8_t pci_bus);
 
     static void enableDebug();
     static void disableDebug();
