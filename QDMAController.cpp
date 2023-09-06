@@ -23,25 +23,25 @@
 
 #include <rc4ml.h>
 
-static bool debug_flag = false;
+[[maybe_unused]] static bool debug_flag = false;
 
 static auto getSysPathBarName(uint8_t bus_id, uint8_t dev_id, uint8_t func_id, uint8_t bar_id) {
 	return fmt::format("/sys/bus/pci/devices/0000:{:02x}:{:02x}.{:x}/resource{}", bus_id, dev_id, func_id, bar_id);
 }
 
-static void errorPrint(std::string_view str){
+[[maybe_unused]] static void errorPrint(std::string_view str) {
 	fmt::print(fg(fmt::color::red), "{}\n", str);
 }
 
-static void passPrint(std::string_view str){
+[[maybe_unused]] static void passPrint(std::string_view str) {
 	fmt::print(fg(fmt::color::green), "{}\n", str);
 }
 
-static void warnPrint(std::string_view str){
+[[maybe_unused]] static void warnPrint(std::string_view str) {
 	fmt::print(fg(fmt::color::yellow), "{}\n", str);
 }
 
-static void infoPrint(std::string_view str){
+[[maybe_unused]] static void infoPrint(std::string_view str) {
 	fmt::print(fg(fmt::color::cyan), "{}\n", str);
 }
 
@@ -382,22 +382,39 @@ uint64_t CPUMemCtl::mapV2P(void *ptr) {
 std::vector<std::shared_ptr<GPUMemCtl>> gpu_mem_ctl_list;
 
 GPUMemCtl::GPUMemCtl(uint64_t size) {
-
+#ifdef GPU_ENABLE
+#else
+    warnPrint(fmt::format("GPU Options is not enabled at compile time"));
+    exit(1);
+#endif
 }
 
 GPUMemCtl::~GPUMemCtl() {
-
+#ifdef GPU_ENABLE
+#else
+    warnPrint(fmt::format("GPU Options is not enabled at compile time"));
+    exit(1);
+#endif
 }
 
 GPUMemCtl *GPUMemCtl::getInstance(size_t pool_size) {
+#ifdef GPU_ENABLE
     // up round to 64KB
     pool_size = (pool_size + 64UL * 1024 - 1) & ~(64UL * 1024 - 1);
 
     return nullptr;
+#else
+    warnPrint(fmt::format("GPU Options is not enabled at compile time"));
+    exit(1);
+#endif
 }
 
 void GPUMemCtl::writeTLB(const std::function<void(uint32_t, uint32_t, uint64_t, uint64_t)> &func) {
-
+#ifdef GPU_ENABLE
+#else
+    warnPrint(fmt::format("GPU Options is not enabled at compile time"));
+    exit(1);
+#endif
 }
 
 uint64_t GPUMemCtl::mapV2P(void *ptr) {
