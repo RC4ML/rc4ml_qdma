@@ -1,7 +1,10 @@
 #ifndef _QDMACONTROLLER_HPP_
 #define _QDMACONTROLLER_HPP_
 
+#include <map>
 #include <array>
+#include <mutex>
+#include <functional>
 
 #include <cstdint>
 #include <immintrin.h>
@@ -44,6 +47,67 @@ private:
 	volatile __m512i *bridge_bar{};
 };
 
+class MemCtl {
+public:
+    virtual ~MemCtl() = 0;
 
+    [[nodiscard]] size_t getPoolSize() const {
+        return pool_size;
+    }
+
+    void *alloc(size_t size);
+
+    void free(void *ptr);
+
+protected:
+    MemCtl() = default;
+
+    size_t pool_size;
+
+    std::mutex allocMutex;
+    /*<首地址, 块大小>*/
+    std::map<uint64_t, uint64_t> free_chunk, used_chunk;
+    /* n_pages, virt_addr_base, phy_addr_array */
+    std::tuple<uint32_t, uint64_t, uint64_t *> page_table;
+};
+
+class CPUMemCtl : public MemCtl {
+public:
+    ~CPUMemCtl();
+
+    CPUMemCtl *getInstance(size_t pool_size);
+
+protected:
+    CPUMemCtl(uint64_t size);
+
+public:
+    /*
+     * void(uint32_t, uint32_t, uint64_t, uint64_t) => (page_index, page_size, virt_addr, phy_addr)
+     */
+    void writeTLB(const std::function<void(uint32_t, uint32_t, uint64_t, uint64_t)> &func);
+
+    // For performance reason, mapV2P does not check the ptr's range
+    uint64_t mapV2P(void *ptr);
+
+};
+
+class GPUMemCtl : public MemCtl {
+public:
+    ~GPUMemCtl();
+
+    GPUMemCtl *getInstance(size_t pool_size);
+
+protected:
+    GPUMemCtl(uint64_t size);
+
+public:
+    /*
+     * void(uint32_t, uint32_t, uint64_t, uint64_t) => (page_index, page_size, virt_addr, phy_addr)
+     */
+    void writeTLB(const std::function<void(uint32_t, uint32_t, uint64_t, uint64_t)> &func);
+
+    uint64_t mapV2P(void *ptr);
+
+};
 
 #endif

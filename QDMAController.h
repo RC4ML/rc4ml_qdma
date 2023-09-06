@@ -13,7 +13,6 @@ void writeConfig(uint32_t index,uint32_t value,uint8_t pci_bus);
 uint32_t readConfig(uint32_t index,uint8_t pci_bus);
 void writeReg(uint32_t index,uint32_t value,uint8_t pci_bus);
 uint32_t readReg(uint32_t index,uint8_t pci_bus);
-void* qdmaCPUAlloc(size_t size, uint8_t pci_bus);
 void writeBridge(uint32_t index, uint64_t *value, uint8_t pci_bus);
 void readBridge(uint32_t index, uint64_t *value, uint8_t pci_bus);
 void* getBridgeAddr(uint8_t pci_bus);

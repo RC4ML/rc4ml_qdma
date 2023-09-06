@@ -209,56 +209,120 @@ void FPGACtl::disableDebug() {
     debug_flag = false;
 }
 
-extern "C" {
-
-void init(uint8_t pci_bus, size_t bridge_bar_size){
-    FPGACtl::explictInit(pci_bus, bridge_bar_size);
+std::pair<uint64_t, uint64_t> findFreeChunk(const std::map<uint64_t, uint64_t> &freeChunk, uint64_t mSize) {
+    for (auto const &it: freeChunk) {
+        if (it.second >= mSize) {
+            return {it.first, it.second};
+        }
+    }
+    return {0, 0};
 }
 
-void* qdmaCPUAlloc(size_t size, uint8_t pci_bus){
-    return nullptr;
-//    pci_bus = get_pci_bus(pci_bus);
-//    int fd,hfd;
-//    void* huge_base;
-//    struct huge_mem hm;
-//    std::string dev_path = fmt::format("/dev/rc4ml_dev");
-//    if ((fd = open(dev_path.c_str() ,O_RDWR)) == -1) {
-//        errorPrint(fmt::format("Open {rc4ml_dev} error, maybe need sudo or you can check whether if {rc4ml_dev} exists", fmt::arg("rc4ml_dev", dev_path)));
-//        exit(1);
-//    }
-//
-//    std::string hfd_path = fmt::format("/media/huge/hfd_{:x}",pci_bus);
-//    if ((hfd = open(hfd_path.c_str(), O_CREAT | O_RDWR | O_SYNC, 0755)) == -1) {
-//        errorPrint(fmt::format("Open {fn} error, maybe need sudo or you can check whether if {fn} exists", fmt::arg("fn", hfd_path)));
-//        exit(1);
-//    }
-//
-//    huge_base = mmap(0, size, PROT_READ | PROT_WRITE, MAP_SHARED, hfd, 0);
-//    passPrint(fmt::format("huge pages base vaddr:{}", fmt::ptr(huge_base)));
-//
-//    hm.vaddr = (unsigned long)huge_base;
-//    hm.size = size;
-//    if(ioctl(fd, HUGE_MAPPING_SET, &hm) == -1){
-//        errorPrint(fmt::format("IOCTL SET failed."));
-//        exit(1);
-//    }
-//    struct huge_mapping map;
-//    map.nhpages = size/(2*1024*1024);
-//    map.phy_addr = (unsigned long*) calloc(map.nhpages, sizeof(unsigned long*));
-//    if (ioctl(fd, HUGE_MAPPING_GET, &map) == -1) {
-//        errorPrint(fmt::format("IOCTL GET failed."));
-//        exit(1);
-//    }
-//
-//    tlb* page_table = (tlb*)calloc(1,sizeof(tlb));
-//    page_table->npages = map.nhpages;
-//    page_table->vaddr = (unsigned long*) calloc(map.nhpages, sizeof(unsigned long*));
-//    page_table->paddr = (unsigned long*) calloc(map.nhpages, sizeof(unsigned long*));
-//    for(int i=0;i<page_table->npages;i++){
-//        page_table->vaddr[i] = (unsigned long)huge_base + ((unsigned long)i)*2*1024*1024;
-//        page_table->paddr[i] = map.phy_addr[i];
-//    }
-//
+static bool contains(const std::map<uint64_t, uint64_t> &mp, uint64_t addr) {
+    auto it = mp.find(addr);
+    if (it == mp.end()) {
+        return false;
+    } else {
+        return true;
+    }
+}
+
+void *MemCtl::alloc(size_t size) {
+    size = (size + 64UL - 1) & ~(64UL - 1);
+    std::lock_guard<std::mutex> lock(allocMutex);
+    /*查找大小大于申请空间大小的空闲内存块*/
+    auto ck = findFreeChunk(free_chunk, size);
+    auto &free_addr = ck.first;
+    auto &free_size = ck.second;
+    /*如果找到的块为空则报告申请失败*/
+    if (free_addr == 0) {
+        warnPrint(fmt::format("No Free CPU Chunk. Alloc failed!"));
+        return nullptr;
+    }
+    /*如果内存块分配后仍存在剩余空间, 从内存块高地址部分分配*/
+    if (free_size > size) {
+        free_chunk[free_addr] = free_size - size;
+        used_chunk[free_addr + free_size - size] = size;
+        return (void *) (free_addr + free_size - size);
+    } else {
+        free_chunk.erase(free_addr);
+        used_chunk[free_addr] = size;
+        return (void *) (free_addr);
+    }
+}
+
+void MemCtl::free(void *ptr) {
+    std::lock_guard<std::mutex> lock(allocMutex);
+    /*检查释放的内存块的合法性*/
+    if (!contains(used_chunk, (uint64_t) ptr)) {
+        errorPrint(fmt::format("Pointer to free is not in Alloc Log"));
+        exit(1);
+    }
+    auto it = used_chunk.find((uint64_t) ptr);
+    uint64_t free_size = it->second;
+    used_chunk.erase(it);
+    /*寻找第一个首地址大于ptr的空闲块, 返回map结构的迭代器*/
+    auto nextIt = free_chunk.upper_bound((uint64_t) ptr);
+    if (!free_chunk.empty()) {
+        auto prevIt = std::prev(nextIt);
+        /*检查前置空闲块 首地址+块大小 与 释放块首地址 是否连续, 连续则将释放块合并到前置空闲块中*/
+        if (prevIt->first + prevIt->second == (uint64_t) ptr) {
+            free_size += prevIt->second;
+            ptr = (void *) prevIt->first;
+        }
+    }
+    /*合并后置块*/
+    if (nextIt != free_chunk.end() && (uint64_t) ptr + free_size == nextIt->first) {
+        free_size += nextIt->second;
+        free_chunk.erase(nextIt);
+    }
+    free_chunk[(int64_t) ptr] = free_size;
+}
+
+std::vector<std::shared_ptr<CPUMemCtl>> cpu_mem_ctl_list;
+
+CPUMemCtl::CPUMemCtl(uint64_t size) {
+    int fd, hfd;
+    void *huge_base;
+    std::string dev_path = fmt::format("/dev/rc4ml_dev");
+    if ((fd = open(dev_path.c_str(), O_RDWR)) == -1) {
+        errorPrint(fmt::format("Open {rc4ml_dev} error, maybe need sudo or you can check whether if {rc4ml_dev} exists",
+                               fmt::arg("rc4ml_dev", dev_path)));
+        exit(1);
+    }
+
+    std::string hfd_path = fmt::format("/media/huge/hfd");
+    if ((hfd = open(hfd_path.c_str(), O_CREAT | O_RDWR | O_SYNC, 0755)) == -1) {
+        errorPrint(fmt::format("Open {fn} error, maybe need sudo or you can check whether if {fn} exists",
+                               fmt::arg("fn", hfd_path)));
+        exit(1);
+    }
+
+    huge_base = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, hfd, 0);
+    close(hfd);
+    passPrint(fmt::format("Huge Pages Base VAddr: {:#x}\nTotal Size: {}", fmt::ptr(huge_base), size));
+
+    struct huge_mem hm{};
+    hm.vaddr = (uint64_t) huge_base;
+    hm.size = size;
+    if (ioctl(fd, HUGE_MAPPING_SET, &hm) == -1) {
+        errorPrint(fmt::format("IOCTL SET failed."));
+        exit(1);
+    }
+
+    struct huge_mapping map{};
+    map.nhpages = size / (2UL * 1024 * 1024);
+    map.phy_addr = new uint64_t[map.nhpages];
+    if (ioctl(fd, HUGE_MAPPING_GET, &map) == -1) {
+        errorPrint(fmt::format("IOCTL GET failed."));
+        exit(1);
+    }
+    close(fd);
+
+    page_table = {map.nhpages, (uint64_t) (huge_base), map.phy_addr};
+    free_chunk.emplace(std::get<1>(page_table), std::get<0>(page_table) * 2UL * 1024 * 1024);
+
+
 //    for(int i=0;i<page_table->npages;i++){
 //        if(debug_flag){
 //            fmt::println("VAddr: {:#016x} PAddr: {:#016x}", page_table->vaddr[i], page_table->paddr[i]);
@@ -271,7 +335,82 @@ void* qdmaCPUAlloc(size_t size, uint8_t pci_bus){
 //        device_list[pci_bus].lite_bar[13]	= 1;
 //        device_list[pci_bus].lite_bar[13]	= 0;
 //    }
-//    return huge_base;
+}
+
+CPUMemCtl::~CPUMemCtl() {
+    const auto &[n_pages, vaddr, parray] = page_table;
+    munmap((void *) vaddr, n_pages * 2UL * 1024 * 1024);
+    delete[] parray;
+}
+
+CPUMemCtl *CPUMemCtl::getInstance(size_t pool_size) {
+    // up round to 2MB
+    pool_size = (pool_size + 2UL * 1024 * 1024 - 1) & ~(2UL * 1024 * 1024 - 1);
+
+    if (cpu_mem_ctl_list.empty()) {
+        auto tmp = new CPUMemCtl(pool_size);
+        cpu_mem_ctl_list.push_back(std::shared_ptr<CPUMemCtl>(tmp));
+        return tmp;
+    } else {
+        static bool warn_flag = false;
+        if (!warn_flag) {
+            warn_flag = true;
+            warnPrint(fmt::format("This QDMA library now only support one CPU Memory Pool"));
+            warnPrint(fmt::format("Request pool size will be ignored"));
+            warnPrint(fmt::format("The previous CPU Memory Pool with size {} will be returned",
+                                  cpu_mem_ctl_list[0]->getPoolSize()));
+        }
+        return cpu_mem_ctl_list[0].get();
+    }
+}
+
+void CPUMemCtl::writeTLB(const std::function<void(uint32_t, uint32_t, uint64_t, uint64_t)> &func) {
+    const auto &[n_pages, vaddr, parray] = page_table;
+    const auto page_size = 2UL * 1024 * 1024;
+    for (int i = 0; i < n_pages; i++) {
+        func(i, page_size, vaddr + i * page_size, parray[i]);
+    }
+}
+
+uint64_t CPUMemCtl::mapV2P(void *ptr) {
+    const auto &[n_pages, vaddr, parray] = page_table;
+    const auto page_size = 2UL * 1024 * 1024;
+    uint64_t offset = (uint64_t) ptr - vaddr;
+    return parray[offset / page_size] + (offset & (page_size - 1));
+}
+
+std::vector<std::shared_ptr<GPUMemCtl>> gpu_mem_ctl_list;
+
+GPUMemCtl::GPUMemCtl(uint64_t size) {
+
+}
+
+GPUMemCtl::~GPUMemCtl() {
+
+}
+
+GPUMemCtl *GPUMemCtl::getInstance(size_t pool_size) {
+    // up round to 64KB
+    pool_size = (pool_size + 64UL * 1024 - 1) & ~(64UL * 1024 - 1);
+
+    return nullptr;
+}
+
+void GPUMemCtl::writeTLB(const std::function<void(uint32_t, uint32_t, uint64_t, uint64_t)> &func) {
+
+}
+
+uint64_t GPUMemCtl::mapV2P(void *ptr) {
+    const auto &[n_pages, vaddr, parray] = page_table;
+    const auto page_size = 64UL * 1024;
+    uint64_t offset = (uint64_t) ptr - vaddr;
+    return parray[offset / page_size] + (offset & (page_size - 1));
+}
+
+extern "C" {
+
+void init(uint8_t pci_bus, size_t bridge_bar_size) {
+    FPGACtl::explictInit(pci_bus, bridge_bar_size);
 }
 
 void writeConfig(uint32_t index,uint32_t value, uint8_t pci_bus){
