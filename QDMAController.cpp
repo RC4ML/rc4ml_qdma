@@ -548,6 +548,7 @@ GPUMemCtl::GPUMemCtl(uint64_t size) {
 GPUMemCtl::~GPUMemCtl() {
 #ifdef GPU_ENABLE
     const auto size = std::get<0>(page_table) * 64UL * 1024;
+    delete[] std::get<2>(page_table);
     ASSERT_EQ(gdr_unmap(gdrDev, gdrUserMapHandler, mapDevPtr, size), 0);
     ASSERT_EQ(gdr_unpin_buffer(gdrDev, gdrUserMapHandler), 0);
     ASSERT_EQ(gdr_close(gdrDev), 0);
