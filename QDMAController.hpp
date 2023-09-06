@@ -95,7 +95,7 @@ class GPUMemCtl : public MemCtl {
 public:
     ~GPUMemCtl();
 
-    GPUMemCtl *getInstance(size_t pool_size);
+    GPUMemCtl *getInstance(int32_t dev_id, size_t pool_size);
 
 protected:
     GPUMemCtl(uint64_t size);
@@ -104,7 +104,7 @@ public:
     /*
      * void(uint32_t, uint32_t, uint64_t, uint64_t) => (page_index, page_size, virt_addr, phy_addr)
      */
-    void writeTLB(const std::function<void(uint32_t, uint32_t, uint64_t, uint64_t)> &func);
+    void writeTLB(const std::function<void(uint32_t, uint32_t, uint64_t, uint64_t)> &func, bool aggr_flag);
 
     uint64_t mapV2P(void *ptr);
 

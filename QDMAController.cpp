@@ -23,6 +23,38 @@
 
 #include <rc4ml.h>
 
+#ifdef GPU_ENABLE
+
+#include <cuda.h>
+#include <gdrapi.h>
+
+#define ASSERT(x)                                               \
+    do                                                          \
+    {                                                           \
+        if (!(x))                                               \
+        {                                                       \
+            fprintf(stderr, "Assertion \"%s\" failed at %s:%d\n", #x, __FILE__, __LINE__); \
+            exit(EXIT_FAILURE);                                 \
+        }                                                       \
+    } while (0)
+
+#define ASSERTDRV(stmt)                     \
+    do                                      \
+    {                                       \
+        CUresult result = (stmt);           \
+        if (result != CUDA_SUCCESS) {       \
+            const char *_err_name;          \
+            cuGetErrorName(result, &_err_name); \
+            fprintf(stderr, "CUDA error: %s\n", _err_name); \
+        }                                   \
+        ASSERT(CUDA_SUCCESS == result);     \
+    } while (0)
+
+#define ASSERT_EQ(P, V) ASSERT((P) == (V))
+#define ASSERT_NEQ(P, V) ASSERT(!((P) == (V)))
+
+#endif
+
 [[maybe_unused]] static bool debug_flag = false;
 
 static auto getSysPathBarName(uint8_t bus_id, uint8_t dev_id, uint8_t func_id, uint8_t bar_id) {
@@ -279,7 +311,7 @@ void MemCtl::free(void *ptr) {
     free_chunk[(int64_t) ptr] = free_size;
 }
 
-std::vector<std::shared_ptr<CPUMemCtl>> cpu_mem_ctl_list;
+static std::vector<std::shared_ptr<CPUMemCtl>> cpu_mem_ctl_list;
 
 CPUMemCtl::CPUMemCtl(uint64_t size) {
     int fd, hfd;
@@ -379,10 +411,134 @@ uint64_t CPUMemCtl::mapV2P(void *ptr) {
     return parray[offset / page_size] + (offset & (page_size - 1));
 }
 
-std::vector<std::shared_ptr<GPUMemCtl>> gpu_mem_ctl_list;
+#ifdef GPU_ENABLE
+
+class gdrMemAllocator {
+public:
+    ~gdrMemAllocator();
+
+    CUresult gpuMemAlloc(CUdeviceptr *pptr, size_t psize, bool align_to_gpu_page = true, bool set_sync_memops = true);
+
+    CUresult gpuMemFree(CUdeviceptr pptr);
+
+private:
+    std::map<CUdeviceptr, CUdeviceptr> _allocations;
+};
+
+gdrMemAllocator::~gdrMemAllocator() {
+    for (auto &it: _allocations) {
+        CUresult ret;
+        ret = cuMemFree(it.second);
+        if (ret != CUDA_SUCCESS) {
+            warnPrint(fmt::format("Fail to free cuMemAlloc GPU Memory"));
+        }
+    }
+}
+
+CUresult gdrMemAllocator::gpuMemAlloc(CUdeviceptr *pptr, size_t psize, bool align_to_gpu_page, bool set_sync_memops) {
+    CUresult ret = CUDA_SUCCESS;
+    CUdeviceptr ptr;
+    size_t size;
+
+    if (align_to_gpu_page) {
+        size = psize + GPU_PAGE_SIZE - 1;
+    } else {
+        size = psize;
+    }
+
+    ret = cuMemAlloc(&ptr, size);
+    if (ret != CUDA_SUCCESS)
+        return ret;
+
+    if (set_sync_memops) {
+        unsigned int flag = 1;
+        ret = cuPointerSetAttribute(&flag, CU_POINTER_ATTRIBUTE_SYNC_MEMOPS, ptr);
+        if (ret != CUDA_SUCCESS) {
+            cuMemFree(ptr);
+            return ret;
+        }
+    }
+
+    if (align_to_gpu_page) {
+        *pptr = (ptr + GPU_PAGE_SIZE - 1) & GPU_PAGE_MASK;
+    } else {
+        *pptr = ptr;
+    }
+    // Record the actual pointer for doing gpuMemFree later.
+    _allocations[*pptr] = ptr;
+
+    return CUDA_SUCCESS;
+}
+
+CUresult gdrMemAllocator::gpuMemFree(CUdeviceptr pptr) {
+    CUresult ret = CUDA_SUCCESS;
+    CUdeviceptr ptr;
+
+    if (_allocations.count(pptr) > 0) {
+        ptr = _allocations[pptr];
+        ret = cuMemFree(ptr);
+        if (ret == CUDA_SUCCESS)
+            _allocations.erase(ptr);
+        return ret;
+    } else {
+        return CUDA_ERROR_INVALID_VALUE;
+    }
+}
+
+static gdrMemAllocator allocator;
+
+static int32_t devID{-1};
+
+static const gdr_mh_t null_mh = {0};
+
+static gdr_t gdrDev{};
+static gdr_mh_t gdrUserMapHandler{null_mh};
+static gpu_tlb_t gdrPageTable{};
+static gdr_info_t info{};
+
+static CUdeviceptr devAddr{};
+static void *mapDevPtr{};
+
+static inline bool operator==(const gdr_mh_t &a, const gdr_mh_t &b) {
+    return a.h == b.h;
+}
+
+#endif
+
+static std::vector<std::shared_ptr<GPUMemCtl>> gpu_mem_ctl_list;
 
 GPUMemCtl::GPUMemCtl(uint64_t size) {
 #ifdef GPU_ENABLE
+    auto page_size = 64UL * 1024;
+
+    CUdevice dev;
+    CUcontext devCtx;
+    ASSERTDRV(cuInit(devID));
+    ASSERTDRV(cuDeviceGet(&dev, devID));
+    ASSERTDRV(cuDevicePrimaryCtxRetain(&devCtx, dev));
+    ASSERTDRV(cuCtxSetCurrent(devCtx));
+
+    ASSERTDRV(allocator.gpuMemAlloc(&devAddr, size));
+
+    gdrDev = gdr_open();
+    ASSERT_NEQ(gdrDev, nullptr);
+
+    // 64KB * 64K = 4GB
+    // 4GB * 20 = 80GB
+    gdrPageTable.pages = new uint64_t[65536 * 20];
+
+    ASSERT_EQ(gdr_pin_buffer(gdrDev, devAddr, size, 0, 0, &gdrUserMapHandler, &gdrPageTable), 0);
+    ASSERT_NEQ(gdrUserMapHandler, null_mh);
+
+    ASSERT_EQ(gdr_map(gdrDev, gdrUserMapHandler, &mapDevPtr, size), 0);
+
+    ASSERT_EQ(gdr_get_info(gdrDev, gdrUserMapHandler, &info), 0);
+
+    ASSERT_EQ((info.va - devAddr), 0);
+    ASSERT_EQ((devAddr & (page_size - 1)), 0);
+
+    page_table = {gdrPageTable.page_entries, (uint64_t) (devAddr), gdrPageTable.pages};
+    free_chunk.emplace((uint64_t) devAddr, size);
 #else
     warnPrint(fmt::format("GPU Options is not enabled at compile time"));
     exit(1);
@@ -391,26 +547,73 @@ GPUMemCtl::GPUMemCtl(uint64_t size) {
 
 GPUMemCtl::~GPUMemCtl() {
 #ifdef GPU_ENABLE
+    const auto size = std::get<0>(page_table) * 64UL * 1024;
+    ASSERT_EQ(gdr_unmap(gdrDev, gdrUserMapHandler, mapDevPtr, size), 0);
+    ASSERT_EQ(gdr_unpin_buffer(gdrDev, gdrUserMapHandler), 0);
+    ASSERT_EQ(gdr_close(gdrDev), 0);
+    ASSERTDRV(allocator.gpuMemFree(devAddr));
 #else
     warnPrint(fmt::format("GPU Options is not enabled at compile time"));
     exit(1);
 #endif
 }
 
-GPUMemCtl *GPUMemCtl::getInstance(size_t pool_size) {
+GPUMemCtl *GPUMemCtl::getInstance(int32_t dev_id, size_t pool_size) {
 #ifdef GPU_ENABLE
+    if (devID >= 0 && devID != dev_id) {
+        errorPrint(fmt::format("This QDMA library now only support one GPU Memory Pool"));
+        errorPrint(fmt::format("New device id {} is not equal to previous device id {}", dev_id, devID));
+        exit(1);
+    }
     // up round to 64KB
     pool_size = (pool_size + 64UL * 1024 - 1) & ~(64UL * 1024 - 1);
 
-    return nullptr;
+    if (pool_size % (2UL * 1024 * 1024) != 0) {
+        warnPrint(fmt::format("Suggest GPU Memory Pool Size to be multiple of 2MB for Page Aggregation"));
+        errorPrint(fmt::format("For correctness safety, the program will exit. Please change the pool size"));
+        exit(1);
+    }
+
+    if (gpu_mem_ctl_list.empty()) {
+        auto tmp = new GPUMemCtl(pool_size);
+        gpu_mem_ctl_list.push_back(std::shared_ptr<GPUMemCtl>(tmp));
+        return tmp;
+    } else {
+        static bool warn_flag = false;
+        if (!warn_flag) {
+            warn_flag = true;
+            warnPrint(fmt::format("This QDMA library now only support one GPU Memory Pool"));
+            warnPrint(fmt::format("Request pool size will be ignored"));
+            warnPrint(fmt::format("The previous GPU Memory Pool with size {} will be returned",
+                                  gpu_mem_ctl_list[0]->getPoolSize()));
+        }
+        return gpu_mem_ctl_list[0].get();
+    }
 #else
     warnPrint(fmt::format("GPU Options is not enabled at compile time"));
     exit(1);
 #endif
 }
 
-void GPUMemCtl::writeTLB(const std::function<void(uint32_t, uint32_t, uint64_t, uint64_t)> &func) {
+void GPUMemCtl::writeTLB(const std::function<void(uint32_t, uint32_t, uint64_t, uint64_t)> &func, bool aggr_flag) {
 #ifdef GPU_ENABLE
+    const auto &[n_pages, vaddr, parray] = page_table;
+
+    if (aggr_flag) {
+        const auto page_size = 2UL * 1024 * 1024;
+        auto aggr_n_pages = n_pages / 32;
+        for (uint32_t i = 0; i < aggr_n_pages; ++i) {
+            for (uint32_t j = 1; j < 32; ++j) {
+                ASSERT_EQ((parray[i * 32 + j] - parray[i * 32 + j - 1]), 65536);
+            }
+            func(i, page_size, vaddr + i * page_size, parray[i * 32]);
+        }
+    } else {
+        const auto page_size = 64UL * 1024;
+        for (int i = 0; i < n_pages; i++) {
+            func(i, page_size, vaddr + i * page_size, parray[i]);
+        }
+    }
 #else
     warnPrint(fmt::format("GPU Options is not enabled at compile time"));
     exit(1);
