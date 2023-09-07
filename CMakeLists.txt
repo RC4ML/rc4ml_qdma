@@ -1,10 +1,7 @@
-cmake_minimum_required(VERSION 3.7)
+cmake_minimum_required(VERSION 3.10)
 set(CMAKE_CXX_STANDARD 17)
 
 project(qdma LANGUAGES CXX)
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2 -fPIC")
-
 
 add_subdirectory(fmt)
 
@@ -21,18 +18,22 @@ SET(COMPILE_CUDA ON)
 if (${COMPILE_CUDA})
 	enable_language(CUDA)
 	set_source_files_properties(${SOURCE_FILES} PROPERTIES LANGUAGE CUDA)
-	add_compile_options(-Xcompiler=-mavx512f)
 	add_definitions(-DGPU_ENABLE)
-else ()
-	add_compile_options(-mavx512f)
 endif ()
 
 add_library(qdma SHARED ${SOURCE_FILES})
 target_link_libraries(qdma PRIVATE fmt::fmt-header-only)
 
 if (${COMPILE_CUDA})
-	target_link_libraries(qdma PRIVATE cuda cudart gdrapi)
+	target_compile_options(qdma PRIVATE -O3 -Xcompiler=-fPIC -Xcompiler=-mavx512f)
+	set_target_properties(qdma PROPERTIES CUDA_ARCHITECTURES "80")
+	#	set_target_properties(qdma PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+	target_link_libraries(qdma PRIVATE gdrapi cuda cudart)
+else ()
+	target_compile_options(qdma PRIVATE -O3 -fPIC -mavx512f)
 endif ()
+
+add_subdirectory(example)
 
 install(
 	TARGETS qdma

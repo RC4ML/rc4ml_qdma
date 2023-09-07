@@ -86,8 +86,8 @@ static std::map<uint8_t, std::shared_ptr<FPGACtl>> device_list;
 FPGACtl::FPGACtl(uint8_t pci_bus,
                  size_t bridge_bar_size):pci_bus(pci_bus),
                                bridge_bar_size(bridge_bar_size) {
-    passPrint(fmt::format(
-            "Init pci dev: 0x{:#x}",pci_bus));
+
+    infoPrint(fmt::format("Try to init FPGA with PCI Bus: {:#x}", pci_bus));
 
     std::string resourceFilename;
     int fd;
@@ -145,6 +145,9 @@ FPGACtl::FPGACtl(uint8_t pci_bus,
                 "MMAP config bar error, please check fpga config bar size in vivado"));
         exit(1);
     }
+
+    passPrint(fmt::format(
+            "Init pci dev: {:#x}", pci_bus));
 }
 
 FPGACtl::~FPGACtl() {
@@ -332,7 +335,7 @@ CPUMemCtl::CPUMemCtl(uint64_t size) {
 
     huge_base = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, hfd, 0);
     close(hfd);
-    passPrint(fmt::format("Huge Pages Base VAddr: {:#x}\nTotal Size: {}", fmt::ptr(huge_base), size));
+    passPrint(fmt::format("Huge Pages Base VAddr: {}\nTotal Size: {}", fmt::ptr(huge_base), size));
 
     struct huge_mem hm{};
     hm.vaddr = (uint64_t) huge_base;
@@ -353,20 +356,6 @@ CPUMemCtl::CPUMemCtl(uint64_t size) {
 
     page_table = {map.nhpages, (uint64_t) (huge_base), map.phy_addr};
     free_chunk.emplace(std::get<1>(page_table), std::get<0>(page_table) * 2UL * 1024 * 1024);
-
-
-//    for(int i=0;i<page_table->npages;i++){
-//        if(debug_flag){
-//            fmt::println("VAddr: {:#016x} PAddr: {:#016x}", page_table->vaddr[i], page_table->paddr[i]);
-//        }
-//        device_list[pci_bus].lite_bar[8]	= (uint32_t)(page_table->vaddr[i]);
-//        device_list[pci_bus].lite_bar[9]	= (uint32_t)((page_table->vaddr[i])>>32);
-//        device_list[pci_bus].lite_bar[10]	= (uint32_t)(page_table->paddr[i]);
-//        device_list[pci_bus].lite_bar[11]	= (uint32_t)((page_table->paddr[i])>>32);
-//        device_list[pci_bus].lite_bar[12]	= (i==0);
-//        device_list[pci_bus].lite_bar[13]	= 1;
-//        device_list[pci_bus].lite_bar[13]	= 0;
-//    }
 }
 
 CPUMemCtl::~CPUMemCtl() {

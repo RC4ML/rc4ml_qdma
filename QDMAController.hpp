@@ -49,7 +49,7 @@ private:
 
 class MemCtl {
 public:
-    virtual ~MemCtl() = 0;
+    virtual ~MemCtl() = default;
 
     [[nodiscard]] size_t getPoolSize() const {
         return pool_size;
@@ -62,7 +62,7 @@ public:
 protected:
     MemCtl() = default;
 
-    size_t pool_size;
+    size_t pool_size{};
 
     std::mutex allocMutex;
     /*<首地址, 块大小>*/
@@ -73,12 +73,12 @@ protected:
 
 class CPUMemCtl : public MemCtl {
 public:
-    ~CPUMemCtl();
+    ~CPUMemCtl() override;
 
-    CPUMemCtl *getInstance(size_t pool_size);
+    static CPUMemCtl *getInstance(size_t pool_size);
 
 protected:
-    CPUMemCtl(uint64_t size);
+    explicit CPUMemCtl(uint64_t size);
 
 public:
     /*
@@ -93,12 +93,12 @@ public:
 
 class GPUMemCtl : public MemCtl {
 public:
-    ~GPUMemCtl();
+    ~GPUMemCtl() override;
 
-    GPUMemCtl *getInstance(int32_t dev_id, size_t pool_size);
+    static GPUMemCtl *getInstance(int32_t dev_id, size_t pool_size);
 
 protected:
-    GPUMemCtl(uint64_t size);
+    explicit GPUMemCtl(uint64_t size);
 
 public:
     /*
