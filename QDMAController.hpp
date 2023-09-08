@@ -86,6 +86,8 @@ public:
      */
     void writeTLB(const std::function<void(uint32_t, uint32_t, uint64_t, uint64_t)> &func);
 
+    void legacyWriteTLB(FPGACtl *fpga_ctl);
+
     // For performance reason, mapV2P does not check the ptr's range
     uint64_t mapV2P(void *ptr);
 

@@ -317,6 +317,8 @@ void MemCtl::free(void *ptr) {
 static std::vector<std::shared_ptr<CPUMemCtl>> cpu_mem_ctl_list;
 
 CPUMemCtl::CPUMemCtl(uint64_t size) {
+    pool_size = size;
+
     int fd, hfd;
     void *huge_base;
     std::string dev_path = fmt::format("/dev/rc4ml_dev");
@@ -398,6 +400,18 @@ uint64_t CPUMemCtl::mapV2P(void *ptr) {
     const auto page_size = 2UL * 1024 * 1024;
     uint64_t offset = (uint64_t) ptr - vaddr;
     return parray[offset / page_size] + (offset & (page_size - 1));
+}
+
+void CPUMemCtl::legacyWriteTLB(FPGACtl *fpga_ctl) {
+    writeTLB([=](uint32_t page_index, uint32_t page_size, uint64_t vaddr, uint64_t paddr) {
+        fpga_ctl->writeReg(8, (uint32_t) (vaddr));
+        fpga_ctl->writeReg(9, (uint32_t) ((vaddr) >> 32));
+        fpga_ctl->writeReg(10, (uint32_t) (paddr));
+        fpga_ctl->writeReg(11, (uint32_t) ((paddr) >> 32));
+        fpga_ctl->writeReg(12, (page_index == 0));
+        fpga_ctl->writeReg(13, 1);
+        fpga_ctl->writeReg(13, 0);
+    });
 }
 
 #ifdef GPU_ENABLE
@@ -498,6 +512,7 @@ static std::vector<std::shared_ptr<GPUMemCtl>> gpu_mem_ctl_list;
 
 GPUMemCtl::GPUMemCtl(uint64_t size) {
 #ifdef GPU_ENABLE
+    pool_size = size;
     auto page_size = 64UL * 1024;
 
     CUdevice dev;
