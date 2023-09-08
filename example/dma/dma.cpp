@@ -643,11 +643,6 @@ void c2h_benchmark_latency(uint8_t pci_bus){
 	}
 	fpga_ctl->writeReg(210, 0);//reset tag_index
 
-	__m512i data;
-	for(int i=0;i<8;i++){
-		data[i] = 1;
-	}
-
 	int beats = burst_length/64;
 	volatile size_t*p_data = (volatile size_t*)p;
 
@@ -657,8 +652,11 @@ void c2h_benchmark_latency(uint8_t pci_bus){
 	for(int i=0;i<total_cmds;i++){
 		while(p_data[i*8*beats] != offset+i*64*beats){
 		}
-        fpga_ctl->writeBridge(0, data);
+        // An example of writing constants to bridge BAR.
+        fpga_ctl->writeBridge(0, {1, 1, 1, 1, 1, 1, 1, 1}); 
 	}
+
+	sleep(1);
 
 	uint32_t count_cmds = fpga_ctl->readReg(512+200);
 	uint32_t count_words = fpga_ctl->readReg(512+201);
@@ -667,7 +665,7 @@ void c2h_benchmark_latency(uint8_t pci_bus){
 
 	int count_error = 0;
 	for(size_t i=0;i<total_words;i++){
-		if(p[i*8] != offset+64*i){
+		if(p[i*16] != offset+64*i){
 			count_error++;
 		}
 	}
@@ -760,14 +758,14 @@ void concurrent_latency(uint8_t pci_bus){
 	}
 	fpga_ctl->writeReg(210, 0);//reset tag_index
 
-	__m512i data;
+	uint64_t data[8];
 	for(int i=0;i<8;i++){
 		data[i] = 1;
 	}
 
 	int beats = burst_length/64;
-	volatile size_t*p_data = (volatile size_t*)p;
-    
+	volatile size_t*p_data = (volatile size_t*)p_c2h;
+
 	//start
 	fpga_ctl->writeReg(103, 0);
 	fpga_ctl->writeReg(204, 0);
@@ -777,6 +775,7 @@ void concurrent_latency(uint8_t pci_bus){
 	for(int i=0;i<total_cmds;i++){
 		while(p_data[i*8*beats] != offset+i*64*beats){
 		}
+        // An example of writing variables to bridge BAR. No need (and not recommended) for introducing AVX data structures.
         fpga_ctl->writeBridge(0, data);
 	}
 
