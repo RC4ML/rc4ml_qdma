@@ -52,3 +52,14 @@ target_link_libraries(qdma_latency PRIVATE qdma pthread)
 #	qdma
 #	pthread
 #)
+
+add_executable(qdma_gpu
+		qdma_gpu.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/dma/dma.cpp
+)
+target_include_directories(qdma_gpu PUBLIC
+		${CMAKE_CURRENT_SOURCE_DIR}/..
+		${CMAKE_CURRENT_SOURCE_DIR}/dma
+)
+target_link_libraries(qdma_gpu PRIVATE fmt::fmt-header-only)
+target_link_libraries(qdma_gpu PRIVATE qdma pthread)

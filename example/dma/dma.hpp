@@ -17,6 +17,8 @@ void h2c_benchmark_latency(uint8_t pci_bus);
 
 void c2h_benchmark_latency(uint8_t pci_bus);
 
+void gpu_h2c_benchmark(uint8_t pci_bus);
+
 void concurrent_latency(uint8_t pci_bus);
 
 #endif
