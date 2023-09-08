@@ -1,26 +1,29 @@
 #include "mmio.hpp"
 
-volatile __m512i *bridge_global;
+FPGACtl *fpga_ctl_global;
 
 void *write_bridge_sub(void *args) {
-    __m512i data;
+    uint64_t data[8];
     for (int i = 0; i < 8; i++) {
         data[i] = 1;
     }
-    size_t size = 1l * 1024 * 1024 * 1024;
+    size_t size = 4 * 1024 * 1024;
 
     for (int i = 0; i < size / 64; i += 1) {
-        _mm512_stream_si512((__m512i * )(bridge_global + i % (size / 64)), data);
+        fpga_ctl_global->writeBridge(i % (size / 64), data);
     }
     return 0;
 }
 
-void benchmark_bridge_write() {
-    size_t size = 1l * 1024 * 1024 * 1024;//byte
+void benchmark_bridge_write(uint8_t pci_bus) {
+    printf("=====AXIB throughput benchmark start=====\n");
+    // FPGACtl::explictInit(pci_bus, 4 * 1024 * 1024);
+    auto fpga_ctl = FPGACtl::getInstance(pci_bus);
+
+    size_t size = 4 * 1024 * 1024;//byte
     int num_threads = 64;
     pthread_t tids[num_threads];
-    volatile __m512i *bridge = (volatile __m512i *) getBridgeAddr();
-    bridge_global = bridge;
+    fpga_ctl_global = fpga_ctl;
 
     //start timer
     struct timespec start_timer, end_timer;

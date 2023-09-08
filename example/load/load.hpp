@@ -3,8 +3,17 @@
 
 #include <ctype.h>
 #include <unistd.h>
-#include <QDMAController.h>
+#include <QDMAController.hpp>
 #include <chrono>
+
+#include <fmt/core.h>
+#include <fmt/chrono.h>
+#include <fmt/ranges.h>
+#include <fmt/os.h>
+#include <fmt/args.h>
+#include <fmt/ostream.h>
+#include <fmt/std.h>
+#include <fmt/color.h>
 
 using namespace std;
 
@@ -44,22 +53,22 @@ using namespace std;
 #define ENABLE_CTIME
 
 
-bool startFpgaH2C(uint32_t *buffer, volatile uint32_t *axilReg);
+bool startFpgaH2C(uint32_t *buffer, FPGACtl *fpga_ctl);
 
-void pauseFpgaH2C(volatile uint32_t *axilReg);
+void pauseFpgaH2C(FPGACtl *fpga_ctl);
 
-void resumeFpgaH2C(volatile uint32_t *axilReg);
+void resumeFpgaH2C(FPGACtl *fpga_ctl);
 
 
-bool startFpgaC2H(volatile uint32_t *buffer, volatile uint32_t *axilReg);
+bool startFpgaC2H(volatile uint32_t *buffer, FPGACtl *fpga_ctl);
 
-void pauseFpgaC2H(volatile uint32_t *axilReg);
+void pauseFpgaC2H(FPGACtl *fpga_ctl);
 
-void resumeFpgaC2H(volatile uint32_t *axilReg);
+void resumeFpgaC2H(FPGACtl *fpga_ctl);
 
-void axilBenchmarkInit(volatile uint32_t *axilReg);
+void axilBenchmarkInit(FPGACtl *fpga_ctl);
 
-uint64_t axilReadBenchmark(volatile uint32_t *axilReg);
+uint64_t axilReadBenchmark(FPGACtl *fpga_ctl);
 
 
 #endif
