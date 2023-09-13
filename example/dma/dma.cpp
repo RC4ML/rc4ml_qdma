@@ -164,7 +164,7 @@ void gpu_h2c_benchmark(uint8_t pci_bus) {
     FPGACtl::explictInit(pci_bus, 4 * 1024 * 1024);
     auto fpga_ctl = FPGACtl::getInstance(pci_bus);
 
-    auto cpu_mem_ctl = GPUMemCtl::getInstance(1UL * 1024 * 1024 * 1024);
+    auto cpu_mem_ctl = GPUMemCtl::getInstance(0, 1UL * 1024 * 1024 * 1024);
 
     cpu_mem_ctl->writeTLB([=](uint32_t page_index, uint32_t page_size, uint64_t vaddr, uint64_t paddr) {
         fpga_ctl->writeReg(8, (uint32_t) (vaddr));
