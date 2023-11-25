@@ -1,6 +1,12 @@
 #ifndef _QDMACONTROLLER_H_
 #define _QDMACONTROLLER_H_
 
+#include <sys/mman.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <immintrin.h>
+#include <rc4ml.h>
+
 #include <stdint.h>
 #include <stddef.h>
 
