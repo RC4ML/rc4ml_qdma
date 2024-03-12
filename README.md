@@ -30,23 +30,37 @@ The following kernel and distros have been tested:
 
 ## Driver Installation
 
-```bash
 1. prepare 
 clone these repo to your home dir or anywhere you like.
-$ git clone git@github.com:RC4ML/qdma_driver.git
-$ git clone --recursive git@github.com:RC4ML/rc4ml_qdma.git
-$ sudo apt-get install libaio1 libaio-dev
+```bash
+git clone git@github.com:RC4ML/qdma_driver.git
+git clone --recursive git@github.com:RC4ML/rc4ml_qdma.git
+sudo apt-get install libaio1 libaio-dev
+```
 
 2. compile
-$ cd ~/qdma_driver
-$ make modulesymfile=/usr/src/linux-headers-$(uname -r)/Module.symvers
-$ make apps modulesymfile=/usr/src/linux-headers-$(uname -r)/Module.symvers
+```bash
+cd ~/qdma_driver
+make modulesymfile=/usr/src/linux-headers-$(uname -r)/Module.symvers
+make apps modulesymfile=/usr/src/linux-headers-$(uname -r)/Module.symvers
+```
 
 3. install apps and header files
-$ sudo make install-apps modulesymfile=/usr/src/linux-headers-$(uname -r)/Module.symvers
+```bash
+sudo make install-apps modulesymfile=/usr/src/linux-headers-$(uname -r)/Module.symvers
+```
 
 4. install kernel mod
-$ sudo insmod src/qdma-pf.ko
+```bash
+sudo insmod src/qdma-pf.ko
+```
+
+If you find the kernel module fails to install due to invalid module format, consider updating your Linux header files by the following script:
+```bash
+sudo apt update && sudo apt upgrade
+sudo apt remove --purge linux-headers-*
+sudo apt autoremove && sudo apt autoclean
+sudo apt install linux-headers-generic
 ```
 
 ## QDMA Lib Installation
@@ -60,8 +74,6 @@ $ cd build
 $ cmake  ..
 $ sudo make install 
 ```
-
-The following contents are still old version.
 
 There are four binary files you can use:
 
