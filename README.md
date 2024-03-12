@@ -23,24 +23,27 @@
 
 # QDMA Software Guide
 
-Ubuntu 18.04 LTS (Kernel 4.15.0-20-generic) has been tested.
+The following kernel and distros have been tested:  
+* Ubuntu 18.04 LTS (Kernel 4.15.0-20-generic)  
+* Ubuntu 22.04 LTS (Kernel 5.15.0-72-generic)  
+* Ubuntu 22.04 LTS (Kernel 5.15.0-100-generic)
 
 ## Driver Installation
 
-```
+```bash
 1. prepare 
 clone these repo to your home dir or anywhere you like.
-$ git clone git@github.com:carlzhang4/qdma_driver.git
-$ git clone git@github.com:carlzhang4/lib_qdma.git
+$ git clone git@github.com:RC4ML/qdma_driver.git
+$ git clone --recursive git@github.com:RC4ML/rc4ml_qdma.git
 $ sudo apt-get install libaio1 libaio-dev
 
 2. compile
 $ cd ~/qdma_driver
-$ make
-$ make apps
+$ make modulesymfile=/usr/src/linux-headers-$(uname -r)/Module.symvers
+$ make apps modulesymfile=/usr/src/linux-headers-$(uname -r)/Module.symvers
 
 3. install apps and header files
-$ sudo make install-apps
+$ sudo make install-apps modulesymfile=/usr/src/linux-headers-$(uname -r)/Module.symvers
 
 4. install kernel mod
 $ sudo insmod src/qdma-pf.ko
@@ -48,23 +51,17 @@ $ sudo insmod src/qdma-pf.ko
 
 ## QDMA Lib Installation
 
-```
-$ cd ~/lib_qdma
+Note: `nvcc` is required in the system PATH.
+
+```bash
+$ cd ~/rc4ml_qdma
 $ mkdir build
 $ cd build
-$ cmake ..
+$ cmake  ..
 $ sudo make install 
 ```
 
-## Software Test
-
-```bash
-$ cd ~/qdma_improve
-$ mkdir build 
-$ cd build
-$ cmake ..
-$ make 
-```
+The following contents are still old version.
 
 There are four binary files you can use:
 
