@@ -531,7 +531,7 @@ GPUMemCtl::GPUMemCtl(uint64_t size) {
     // 4GB * 20 = 80GB
     gdrPageTable.pages = new uint64_t[65536 * 20];
 
-    ASSERT_EQ(gdr_pin_buffer(gdrDev, devAddr, size, 0, 0, &gdrUserMapHandler, &gdrPageTable), 0);
+    ASSERT_EQ(rc4ml_pin_buffer(gdrDev, devAddr, size, 0, 0, &gdrUserMapHandler, &gdrPageTable), 0);
     ASSERT_NEQ(gdrUserMapHandler, null_mh);
 
     ASSERT_EQ(gdr_map(gdrDev, gdrUserMapHandler, &mapDevPtr, size), 0);
