@@ -113,9 +113,12 @@ different workloads.
 - `startFpgaC2H(...)` will initialize the card to host channel with a simple throughput benchmark
 - `axilReadBenchmark(...)` will test the axi lite read latency
 
-
-<font color=#DC143C>**Attention!**</font> Before you run these binaries, you must program FPGA and reboot the host.
+```diff
+- **Attention!**
+```
+Before you run these binaries, you must program FPGA and reboot the host.
 Each time you reboot you need to redo the insmod step (i.e., sudo insmod src/qdma-pf.ko)
+
 
 And following instructions needs to be executed before you run binaries.
 
