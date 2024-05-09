@@ -114,8 +114,7 @@ different workloads.
 - `axilReadBenchmark(...)` will test the axi lite read latency
 
 ```diff
-- **Attention!** Before you run these binaries, you must program FPGA and reboot the host.
-Each time you reboot you need to redo the insmod step (i.e., sudo insmod src/qdma-pf.ko)
+- **Attention!** Before you run these binaries, you must program FPGA and reboot the host. Each time you reboot you need to redo the insmod step (i.e., sudo insmod src/qdma-pf.ko)
 ```
 
 
