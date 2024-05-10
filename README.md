@@ -134,6 +134,11 @@ $ dma-ctl qdma1a000 q add idx 3 mode st dir bi
 $ dma-ctl qdma1a000 q start idx 3 dir bi desc_bypass_en pfetch_bypass_en
 ```
 
+```diff
+- **Attention!** If you meet errors like "bash: echo: write error: Invalid argument" while executing instructions, check if related instruction has been in /etc/rc.local file and has auto-started on boot.
+```
+
+
 Run your binaries according to which bitstream is in FPGA.
 
 There are some useful commands  (provided by Xilinx QDMA Linux Kernel Driver) in cmd.txt.
