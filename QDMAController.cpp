@@ -481,7 +481,7 @@ CUresult gdrMemAllocator::gpuMemFree(CUdeviceptr pptr) {
         ptr = _allocations[pptr];
         ret = cuMemFree(ptr);
         if (ret == CUDA_SUCCESS)
-            _allocations.erase(ptr);
+            _allocations.erase(pptr);
         return ret;
     } else {
         return CUDA_ERROR_INVALID_VALUE;
@@ -517,7 +517,7 @@ GPUMemCtl::GPUMemCtl(uint64_t size) {
 
     CUdevice dev;
     CUcontext devCtx;
-    ASSERTDRV(cuInit(devID));
+    ASSERTDRV(cuInit(0));
     ASSERTDRV(cuDeviceGet(&dev, devID));
     ASSERTDRV(cuDevicePrimaryCtxRetain(&devCtx, dev));
     ASSERTDRV(cuCtxSetCurrent(devCtx));
@@ -580,6 +580,7 @@ GPUMemCtl *GPUMemCtl::getInstance(int32_t dev_id, size_t pool_size) {
     }
 
     if (gpu_mem_ctl_list.empty()) {
+        devID = dev_id;
         auto tmp = new GPUMemCtl(pool_size);
         gpu_mem_ctl_list.push_back(std::shared_ptr<GPUMemCtl>(tmp));
         return tmp;
@@ -594,6 +595,15 @@ GPUMemCtl *GPUMemCtl::getInstance(int32_t dev_id, size_t pool_size) {
         }
         return gpu_mem_ctl_list[0].get();
     }
+#else
+    warnPrint(fmt::format("GPU Options is not enabled at compile time"));
+    exit(1);
+#endif
+}
+
+void GPUMemCtl::cleanCtx() {
+#ifdef GPU_ENABLE
+    gpu_mem_ctl_list.clear();
 #else
     warnPrint(fmt::format("GPU Options is not enabled at compile time"));
     exit(1);

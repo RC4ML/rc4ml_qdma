@@ -98,7 +98,8 @@ public:
     ~GPUMemCtl() override;
 
     static GPUMemCtl *getInstance(int32_t dev_id, size_t pool_size);
-
+    [[maybe_unused]] static void cleanCtx();
+    
 protected:
     explicit GPUMemCtl(uint64_t size);
 
