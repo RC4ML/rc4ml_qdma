@@ -632,6 +632,15 @@ uint64_t GPUMemCtl::mapV2P(void *ptr) {
     return parray[offset / page_size] + (offset & (page_size - 1));
 }
 
+void *GPUMemCtl::getMapDevPtr() const {
+#ifdef GPU_ENABLE
+    return mapDevPtr;
+#else
+    warnPrint(fmt::format("GPU Options is not enabled at compile time"));
+    exit(1);
+#endif
+}
+
 extern "C" {
 
 void init(uint8_t pci_bus, size_t bridge_bar_size) {

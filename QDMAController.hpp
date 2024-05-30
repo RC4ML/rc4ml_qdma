@@ -110,6 +110,8 @@ public:
 
     uint64_t mapV2P(void *ptr);
 
+    void *getMapDevPtr() const;
+
 };
 
 #endif
