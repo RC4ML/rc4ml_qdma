@@ -114,6 +114,8 @@ public:
     void *getDevPtr() const;
     void *getMapDevPtr() const;
 
+    bool chechPhyContiguous() const;
+
 };
 
 #endif

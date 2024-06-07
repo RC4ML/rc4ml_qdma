@@ -660,6 +660,22 @@ void *GPUMemCtl::getMapDevPtr() const {
 #endif
 }
 
+bool GPUMemCtl::chechPhyContiguous() const {
+#ifdef GPU_ENABLE
+    const auto &[n_pages, vaddr, parray] = page_table;
+    const auto page_size = 64UL * 1024;
+    for (int i = 1; i < n_pages; i++) {
+        if (parray[i] - parray[i - 1] != page_size) {
+            return false;
+        }
+    }
+    return true;
+#else
+    warnPrint(fmt::format("GPU Options is not enabled at compile time"));
+    exit(1);
+#endif
+}
+
 extern "C" {
 
 void init(uint8_t pci_bus, size_t bridge_bar_size) {
