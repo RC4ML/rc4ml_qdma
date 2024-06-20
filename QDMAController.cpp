@@ -390,7 +390,7 @@ CPUMemCtl *CPUMemCtl::getInstance(size_t pool_size) {
 void CPUMemCtl::writeTLB(const std::function<void(uint32_t, uint32_t, uint64_t, uint64_t)> &func) {
     const auto &[n_pages, vaddr, parray] = page_table;
     const auto page_size = 2UL * 1024 * 1024;
-    for (int i = 0; i < n_pages; i++) {
+    for (int64_t i = 0; i < (int64_t)n_pages; i++) {
         func(i, page_size, vaddr + i * page_size, parray[i]);
     }
 }
@@ -403,7 +403,7 @@ uint64_t CPUMemCtl::mapV2P(void *ptr) {
 }
 
 void CPUMemCtl::legacyWriteTLB(FPGACtl *fpga_ctl) {
-    writeTLB([=](uint32_t page_index, uint32_t page_size, uint64_t vaddr, uint64_t paddr) {
+    writeTLB([=](uint32_t page_index, [[maybe_unused]]uint32_t page_size, uint64_t vaddr, uint64_t paddr) {
         fpga_ctl->writeReg(8, (uint32_t) (vaddr));
         fpga_ctl->writeReg(9, (uint32_t) ((vaddr) >> 32));
         fpga_ctl->writeReg(10, (uint32_t) (paddr));
@@ -510,7 +510,7 @@ static inline bool operator==(const gdr_mh_t &a, const gdr_mh_t &b) {
 
 static std::vector<std::shared_ptr<GPUMemCtl>> gpu_mem_ctl_list;
 
-GPUMemCtl::GPUMemCtl(uint64_t size) {
+GPUMemCtl::GPUMemCtl([[maybe_unused]]uint64_t size) {
 #ifdef GPU_ENABLE
     pool_size = size;
     auto page_size = 64UL * 1024;
@@ -563,7 +563,7 @@ GPUMemCtl::~GPUMemCtl() {
 #endif
 }
 
-GPUMemCtl *GPUMemCtl::getInstance(int32_t dev_id, size_t pool_size) {
+GPUMemCtl *GPUMemCtl::getInstance([[maybe_unused]]int32_t dev_id, [[maybe_unused]]size_t pool_size) {
 #ifdef GPU_ENABLE
     if (devID >= 0 && devID != dev_id) {
         errorPrint(fmt::format("This QDMA library now only support one GPU Memory Pool"));
@@ -610,7 +610,7 @@ void GPUMemCtl::cleanCtx() {
 #endif
 }
 
-void GPUMemCtl::writeTLB(const std::function<void(uint32_t, uint32_t, uint64_t, uint64_t)> &func, bool aggr_flag) {
+void GPUMemCtl::writeTLB([[maybe_unused]]const std::function<void(uint32_t, uint32_t, uint64_t, uint64_t)> &func, [[maybe_unused]]bool aggr_flag) {
 #ifdef GPU_ENABLE
     const auto &[n_pages, vaddr, parray] = page_table;
 
