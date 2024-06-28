@@ -137,7 +137,9 @@ $ dma-ctl qdma1a000 q start idx 3 dir bi desc_bypass_en pfetch_bypass_en
 ```diff
 - **Attention!** If you meet errors like "bash: echo: write error: Invalid argument" while executing instructions, check if related instruction has been in /etc/rc.local file and has auto-started on boot.
 ```
-
+```diff
+- **Attention!** Other errors see [here](https://www.notion.so/rc4mlzju/QDMA-d0778b6595e440ae9c87ed7bc76873b3).
+```
 
 Run your binaries according to which bitstream is in FPGA.
 
