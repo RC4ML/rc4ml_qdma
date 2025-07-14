@@ -68,11 +68,11 @@ sudo apt install linux-headers-generic
 Note: `nvcc` is required in the system PATH.
 
 ```bash
-$ cd ~/rc4ml_qdma
-$ mkdir build
-$ cd build
-$ cmake  ..
-$ sudo make install 
+cd ~/rc4ml_qdma
+mkdir build
+cd build
+cmake  ..
+sudo make install 
 ```
 
 There are four binary files you can use:
@@ -122,16 +122,16 @@ different workloads.
 And following instructions needs to be executed before you run binaries.
 
 ```bash
-$ sudo su
-$ echo 1024 > /sys/bus/pci/devices/0000:1a:00.0/qdma/qmax
-$ dma-ctl qdma1a000 q add idx 0 mode st dir bi
-$ dma-ctl qdma1a000 q start idx 0 dir bi desc_bypass_en pfetch_bypass_en
-$ dma-ctl qdma1a000 q add idx 1 mode st dir bi
-$ dma-ctl qdma1a000 q start idx 1 dir bi desc_bypass_en pfetch_bypass_en
-$ dma-ctl qdma1a000 q add idx 2 mode st dir bi
-$ dma-ctl qdma1a000 q start idx 2 dir bi desc_bypass_en pfetch_bypass_en
-$ dma-ctl qdma1a000 q add idx 3 mode st dir bi
-$ dma-ctl qdma1a000 q start idx 3 dir bi desc_bypass_en pfetch_bypass_en
+sudo su
+echo 1024 > /sys/bus/pci/devices/0000:1a:00.0/qdma/qmax
+dma-ctl qdma1a000 q add idx 0 mode st dir bi
+dma-ctl qdma1a000 q start idx 0 dir bi desc_bypass_en pfetch_bypass_en
+dma-ctl qdma1a000 q add idx 1 mode st dir bi
+dma-ctl qdma1a000 q start idx 1 dir bi desc_bypass_en pfetch_bypass_en
+dma-ctl qdma1a000 q add idx 2 mode st dir bi
+dma-ctl qdma1a000 q start idx 2 dir bi desc_bypass_en pfetch_bypass_en
+dma-ctl qdma1a000 q add idx 3 mode st dir bi
+dma-ctl qdma1a000 q start idx 3 dir bi desc_bypass_en pfetch_bypass_en
 ```
 
 ```diff

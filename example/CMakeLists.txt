@@ -9,12 +9,12 @@ add_compile_options(-O3 -mavx512f -march=native)
 add_executable(qdma_throughput
         qdma_throughput.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/dma/dma.cpp
-        #	${CMAKE_CURRENT_SOURCE_DIR}/mmio/mmio.cpp
+        #       ${CMAKE_CURRENT_SOURCE_DIR}/mmio/mmio.cpp
 )
 target_include_directories(qdma_throughput PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/..
         ${CMAKE_CURRENT_SOURCE_DIR}/dma
-        #	${CMAKE_CURRENT_SOURCE_DIR}/mmio
+        #       ${CMAKE_CURRENT_SOURCE_DIR}/mmio
 )
 target_link_libraries(qdma_throughput PRIVATE fmt::fmt-header-only)
 target_link_libraries(qdma_throughput PRIVATE qdma pthread)
@@ -35,7 +35,7 @@ add_executable(qdma_latency
 	${CMAKE_CURRENT_SOURCE_DIR}/dma/dma.cpp
 )
 target_include_directories(qdma_latency PUBLIC
-${CMAKE_CURRENT_SOURCE_DIR}/..
+        ${CMAKE_CURRENT_SOURCE_DIR}/..
 	${CMAKE_CURRENT_SOURCE_DIR}/dma
 )
 target_link_libraries(qdma_latency PRIVATE fmt::fmt-header-only)
@@ -63,3 +63,14 @@ target_include_directories(qdma_gpu PUBLIC
 )
 target_link_libraries(qdma_gpu PRIVATE fmt::fmt-header-only)
 target_link_libraries(qdma_gpu PRIVATE qdma pthread)
+
+add_executable(mmio_bridge
+        mmio_bridge.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/mmio/mmio.cpp
+)
+target_include_directories(mmio_bridge PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/..
+        ${CMAKE_CURRENT_SOURCE_DIR}/mmio
+)
+target_link_libraries(mmio_bridge PRIVATE fmt::fmt-header-only)
+target_link_libraries(mmio_bridge PRIVATE qdma pthread)
