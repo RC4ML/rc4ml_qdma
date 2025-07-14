@@ -67,6 +67,24 @@ sudo apt install linux-headers-generic
 
 Note: `nvcc` is required in the system PATH.
 
+Important: If `nvcc` is not in the system PATH, **Do not** install it from apt directly. Instead, do as follows:
+   1. Run the following commands:
+   ```bash
+   $ cd /usr/local
+   $ ls
+   ```
+   2. You shall see some folders like `cuda-XX.X`, where `XX.X` is the version of the CUDA toolkit.
+   3. Run `$ nvidia-smi`, you can see the driver's CUDA version of the GPU.
+   4. Choose the proper version of CUDA toolkit. The CUDA versions of the toolkit and the driver don't have to be identical.
+   5. Run the following commands, replace '`XX.X`' with the toolkit version you choose:
+   ```bash
+   $ export PATH=/usr/local/cuda-XX.X/bin:$PATH
+   $ export LD_LIBRARY_PATH=/usr/local/cuda-XX.X/lib64:$LD_LIBRARY_PATH
+   ```
+   6. run `$ nvcc -V`, if you see the version of the CUDA toolkit, then you can go to the next step.
+
+### Lib install
+
 ```bash
 cd ~/rc4ml_qdma
 mkdir build
