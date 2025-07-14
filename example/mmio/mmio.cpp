@@ -248,7 +248,7 @@ void *write_bridge_sub(void *args)
 
 void benchmark_bridge_write(uint8_t pci_bus, uint8_t is_wc)
 {
-    size_t size = 256 * 1024 * 1024; // size of data that a single thread should write (in bytes)
+    size_t size = 64 * 1024 * 1024; // size of data that a single thread should write (in bytes)
     int num_threads = 4, repeat_times = 16;
     pthread_t tids[num_threads];
     size_t args[num_threads][3];
