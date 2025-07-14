@@ -65,6 +65,11 @@ static auto getSysPathBarName(uint8_t bus_id, uint8_t dev_id, uint8_t func_id, u
     return fmt::format("/sys/bus/pci/devices/0000:{:02x}:{:02x}.{:x}/resource{}", bus_id, dev_id, func_id, bar_id);
 }
 
+static auto getSysPathBarName_WC(uint8_t bus_id, uint8_t dev_id, uint8_t func_id, uint8_t bar_id)
+{
+    return fmt::format("/sys/bus/pci/devices/0000:{:02x}:{:02x}.{:x}/resource{}_wc", bus_id, dev_id, func_id, bar_id);
+}
+
 [[maybe_unused]] static void errorPrint(std::string_view str)
 {
     fmt::print(fg(fmt::color::red), "{}\n", str);
@@ -126,12 +131,10 @@ FPGACtl::FPGACtl(uint8_t pci_bus,
     }
 
     // axi-bridge
-    resourceFilename = getSysPathBarName(pci_bus, pci_dev, dev_func, 4); // bridge bar is 4
+    resourceFilename = write_combine ? getSysPathBarName_WC(pci_bus, pci_dev, dev_func, 4)
+                                     : getSysPathBarName(pci_bus, pci_dev, dev_func, 4); // bridge bar is 4
 
-    if (!write_combine)
-        fd = open(resourceFilename.c_str(), O_RDWR);
-    else
-        fd = open("/dev/rc4ml_dev", O_RDWR);
+    fd = open(resourceFilename.c_str(), O_RDWR);
     if (fd < 0)
     {
         errorPrint(fmt::format(
