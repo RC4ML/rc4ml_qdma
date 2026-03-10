@@ -93,6 +93,8 @@ cmake  ..
 sudo make install 
 ```
 
+If you face compile error `identifier "__builtin_ia32_serialize" is undefined`, it means your NVCC version does not match CUDA version. Then add `-DCMAKE_CUDA_COMPILER=/usr/local/cuda-X.X/bin/nvcc` (please replace X.X with your cuda version) to cmake parameters in order to manually designate your NVCC.
+
 There are five binary files you can use:
 
 ### `qdma_throughput`
