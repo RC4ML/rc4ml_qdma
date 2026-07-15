@@ -63,6 +63,17 @@ sudo apt autoremove && sudo apt autoclean
 sudo apt install linux-headers-generic
 ```
 
+## Prepare gdrcopy Library
+
+If the machine has not installed our patched gdrcopy, please do the following steps:
+```bash
+git clone git@github.com:RC4ML/gdrcopy.git
+cd gdrcopy
+make
+sudo make install
+sudo ./insmod.sh
+```
+
 ## QDMA Lib Installation
 
 Note: `nvcc` is required in the system PATH.
