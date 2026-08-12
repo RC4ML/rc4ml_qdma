@@ -32,7 +32,7 @@ else ()
 	target_compile_options(qdma PRIVATE -O3 -fPIC -mavx512f -no-pie)
 endif ()
 
-add_subdirectory(example)
+add_subdirectory(tb)
 
 install(
 	TARGETS qdma

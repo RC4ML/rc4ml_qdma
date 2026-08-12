@@ -286,6 +286,137 @@ around 8M bridge write, when ops exceeds this, the latency increase a lot.
 
 ---
 
+## CPU && GPU
+### Throughput
+- pool_size = 1GB
+- total_cmds = 256 * 1024
+#### H2C
+
+| CPU | Bytes | Speed |     | GPU | Bytes | Speed |
+| --- | :---: | :---: | --- | --- | :---: | :---: |
+|     |  64   | 2.10  |     |     |  64   | 1.58  |
+|     |  128  | 3.94  |     |     |  128  | 2.96  |
+|     |  256  | 7.78  |     |     |  256  | 5.64  |
+|     |  512  | 12.09 |     |     |  512  | 10.68 |
+|     | 1024  | 12.14 |     |     | 1024  | 10.61 |
+
+#### C2H
+
+| CPU | Bytes | Speed |     | GPU | Bytes | Speed |
+| --- | :---: | :---: | --- | --- | :---: | :---: |
+|     |  64   | 4.97  |     |     |  64   | 4.97  |
+|     |  128  | 9.93  |     |     |  128  | 9.93  |
+|     |  256  | 11.91 |     |     |  256  | 11.92 |
+|     |  512  | 12.19 |     |     |  512  | 13.00 |
+|     | 1024  | 12.18 |     |     | 1024  | 13.00 |
+---
+### random
+- pool_size = 1GB
+- total_cmds = 256 * 1024
+#### H2C
+
+| CPU | Bytes | Speed |  OPS   |     | GPU | Bytes | Speed |  OPS   |
+| :-: | :---: | :---: | :----: | --- | --- | :---: | :---: | :----: |
+|     |  64   | 2.01  | 33.732 |     |     |  64   | 1.52  | 25.472 |
+|     |  128  | 3.98  | 33.417 |     |     |  128  | 2.92  | 24.535 |
+|     |  256  | 7.30  | 30.629 |     |     |  256  | 5.82  | 24.400 |
+|     |  512  | 12.00 | 25.176 |     |     |  512  | 10.48 | 21.971 |
+|     | 1024  | 11.95 | 12.530 |     |     | 1024  | 10.63 | 11.151 |
+
+#### C2H
+
+| CPU | Bytes | Speed |  OPS   |     | GPU | Bytes | Speed |  OPS   |
+| :-: | :---: | :---: | :----: | --- | --- | :---: | :---: | :----: |
+|     |  64   | 4.97  | 83.333 |     |     |  64   | 4.97  | 83.332 |
+|     |  128  | 9.90  | 83.035 |     |     |  128  | 9.93  | 83.332 |
+|     |  256  | 11.68 | 48.991 |     |     |  256  | 11.92 | 50.000 |
+|     |  512  | 11.76 | 24.660 |     |     |  512  | 13.00 | 27.269 |
+|     | 1024  | 11.75 |  12.3  |     |     | 1024  | 13.00 | 13.633 |
+---
+### latency
+- pool_size = 1GB
+- total_cmds = 256 * 1024
+- Wait cycles: minimum cycles between two cmds
+#### H2C
+
+|   CPU   |   Bytes   |   Wait cycles   |   OPS limit (Mops)   |   Throughput (Mops)   |   Throughput (GB/s)   |   Latency (us)   |
+| :-----: | :-------: | :-------------: | :------------------: | :-------------------: | :-------------------: | :--------------: |
+|         |    64     |       50        |          5           |          4.6          |          0.3          |       1.17       |
+|         |           |       25        |          10          |          8.8          |          0.6          |       1.12       |
+|         |           |       12        |         20.8         |         17.0          |          1.1          |       1.16       |
+|         |           |        6        |         41.7         |         29.8          |          1.9          |       1.17       |
+|         |           |        0        |          -           |         31.6          |          2.0          |       3.15       |
+|         |           |                 |                      |                       |                       |                  |
+|         | 4 * 1024  |       100       |         2.5          |          2.3          |          9.3          |       1.60       |
+|         |           |       90        |         2.8          |          2.6          |         10.4          |       1.62       |
+|         |           |       85        |         2.9          |          2.7          |         11.0          |       1.67       |
+|         |           |       80        |         3.1          |          2.9          |         11.6          |       1.91       |
+|         |           |       75        |         3.3          |          3.1          |         12.3          |      13.99       |
+|         |           |       70        |         3.6          |          3.1          |         12.3          |      14.16       |
+|         |           |       50        |         5.0          |          3.1          |         12.3          |      14.33       |
+|         |           |                 |                      |                       |                       |                  |
+| **GPU** | **Bytes** | **Wait cycles** | **OPS limit (Mops)** | **Throughput (Mops)** | **Throughput (GB/s)** | **Latency (us)** |
+|         |    64     |       50        |          5           |          4.6          |          0.3          |       1.23       |
+|         |           |       25        |          10          |          8.8          |          0.6          |       1.22       |
+|         |           |       12        |         20.8         |         17.0          |          1.1          |       1.23       |
+|         |           |        6        |         41.7         |         29.8          |          1.9          |       1.21       |
+|         |           |        0        |          -           |         30.4          |          1.9          |       3.30       |
+|         |           |                 |                      |                       |                       |                  |
+|         | 4 * 1024  |       100       |         2.5          |          2.3          |          9.3          |       2.94       |
+|         |           |       90        |         2.8          |          2.6          |         10.2          |       3.28       |
+|         |           |       85        |         2.9          |          2.6          |         10.6          |      16.38       |
+|         |           |       80        |         3.1          |          2.6          |         10.6          |      16.51       |
+|         |           |       75        |         3.3          |          2.6          |         10.6          |      16.53       |
+|         |           |       70        |         3.6          |          2.6          |         10.6          |      16.56       |
+|         |           |       50        |         5.0          |          2.6          |         10.6          |      16.65       |
+
+
+#### C2H
+- Latency CMD: duration between cmd issues and axibridge return
+- Latency DATA: duration between last data issues and axibridge return
+- \* : this latency can be thousands us sometimes, because write latency use bridge channel to reply, single thread can issue around 8M bridge write, when ops exceeds this, the latency increase a lot.
+
+|   CPU   |   Bytes   |   Wait cycles   |   OPS limit (Mops)   |   Throughput (Mops)   |   Throughput (GB/s)   |   Latency CMD (us)   |   Latency DATA (us)   |
+| :-----: | :-------: | :-------------: | :------------------: | :-------------------: | :-------------------: | :------------------: | :-------------------: |
+|         |    64     |       50        |          5           |          4.6          |         0.29          |         1.6          |          1.6          |
+|         |           |       25        |          10          |          5.8          |         0.34          |          *           |           *           |
+|         |           |                 |                      |                       |                       |                      |                       |
+|         | 4 * 1024  |       100       |         2.5          |          2.3          |         9.35          |         1.5          |          1.2          |
+|         |           |       90        |         2.8          |          2.6          |         10.37         |         1.5          |          1.2          |
+|         |           |       85        |         2.9          |          2.7          |         10.96         |         1.6          |          1.3          |
+|         |           |       80        |         3.1          |          2.9          |         11.63         |         1.7          |          1.4          |
+|         |           |       75        |         3.3          |          3.0          |         12.17         |         11.3         |          6.9          |
+|         |           |       70        |         3.6          |          3.0          |         12.17         |         11.3         |          6.9          |
+|         |           |       50        |         5.0          |          3.0          |         12.17         |         11.4         |          7.0          |
+|         |           |                 |                      |                       |                       |                      |                       |
+| **GPU** | **Bytes** | **Wait cycles** | **OPS limit (Mops)** | **Throughput (Mops)** | **Throughput (GB/s)** | **Latency CMD (us)** | **Latency DATA (us)** |
+|         |    64     |       50        |          5           |          0.9          |         0.06          |          *           |           *           |
+|         |           |       25        |          10          |          0.9          |         0.06          |          *           |           *           |
+|         |           |                 |                      |                       |                       |                      |                       |
+|         | 4 * 1024  |       100       |         2.5          |          0.7          |         2.92          |          *           |           *           |
+|         |           |       90        |         2.8          |          0.7          |         2.93          |          *           |           *           |
+|         |           |       85        |         2.9          |          0.7          |         2.96          |          *           |           *           |
+|         |           |       80        |         3.1          |          0.7          |         2.96          |          *           |           *           |
+|         |           |       75        |         3.3          |          0.7          |         2.95          |          *           |           *           |
+|         |           |       70        |         3.6          |          0.7          |         2.73          |          *           |           *           |
+|         |           |       50        |         5.0          |          0.7          |         2.73          |          *           |           *           |
+
+---
+
+### MMIO
+- repeat_times = 16
+- size = 1 * 1024 * 1024 (size of data a thread should write)
+
+| theads num | speed    |
+| ---------- | -------- |
+| 1          | 0.263201 |
+| 2          | 0.766281 |
+| 4          | 1.035202 |
+| 8          | 2.051150 |
+| 16         | 3.851957 |
+
+
+
 # QDMA C2H bug
 
 1. When running with more than 8 qs, it will always fail. QDMA C2H data port's ready would be down after receiving
@@ -306,3 +437,4 @@ around 8M bridge write, when ops exceeds this, the latency increase a lot.
 
 1. All statistics are calculated at the 250M user clock, (so if your speed is 10.6 GB/s at most, maybe you have used
    300M user clock).
+2. If GPU speed is significantly lower than that of the CPU, tb/press should be run during testing.
