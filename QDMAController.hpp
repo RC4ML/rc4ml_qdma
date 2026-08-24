@@ -9,52 +9,61 @@
 #include <cstdint>
 #include <immintrin.h>
 
-class FPGACtl{
+class FPGACtl
+{
 protected:
-	FPGACtl(uint8_t pci_bus, size_t bridge_bar_size);
-public:
-	~FPGACtl();
+    FPGACtl(uint8_t pci_bus, size_t bridge_bar_size, uint8_t write_combine = 0);
 
-	static void explictInit(uint8_t pci_bus, size_t bridge_bar_size);
-	static FPGACtl* getInstance(uint8_t pci_bus);
+public:
+    ~FPGACtl();
+
+    static void explictInit(uint8_t pci_bus, size_t bridge_bar_size, uint8_t write_combine = 0);
+    static FPGACtl *getInstance(uint8_t pci_bus);
 
     static void enableDebug();
     static void disableDebug();
 
 public:
     int versalInit(uint32_t baseH2cQid=0, uint32_t baseC2hQid=64);
-	void writeConfig(uint32_t index,uint32_t value);
+	void writeConfig(uint32_t index, uint32_t value);
 	uint32_t readConfig(uint32_t index);
 
-	void writeReg(uint32_t index,uint32_t value);
-	uint32_t readReg(uint32_t index);
+    void writeReg(uint32_t index, uint32_t value);
+    uint32_t readReg(uint32_t index);
 
-	void writeBridge(uint32_t index, const std::array<uint64_t, 8> &value);
-	std::array<uint64_t, 8> readBridge(uint32_t index);
+    void writeBridge(uint32_t index, const std::array<uint64_t, 8> &value);
+    std::array<uint64_t, 8> readBridge(uint32_t index);
     void writeBridge(uint32_t index, uint64_t *value);
     void readBridge(uint32_t index, uint64_t *value);
     void writeBridgeAligned(uint32_t index, uint64_t *value);
     void readBridgeAligned(uint32_t index, uint64_t *value);
 
-	void* getBridgeAddr();
-	void* getLiteAddr();
+    void *getBridgeAddr();
+    void *getLiteAddr();
+
+    void enableWriteCombine();
+    void disableWriteCombine();
 
 private:
-	uint8_t pci_bus;
+    uint8_t pci_bus, write_combine;
     size_t bridge_bar_size;
+
 private:
     void issueQdmaContext(uint8_t sel, uint8_t op, uint32_t qid);
     void enableQdmaMask();
     volatile uint32_t *config_bar{};
-	volatile uint32_t *lite_bar{};
-	volatile __m512i *bridge_bar{};
+    volatile uint32_t *lite_bar{};
+    volatile __m512i *bridge_bar{};
+    volatile __m512i *wc_bridge_bar{};
 };
 
-class MemCtl {
+class MemCtl
+{
 public:
     virtual ~MemCtl() = default;
 
-    [[nodiscard]] size_t getPoolSize() const {
+    [[nodiscard]] size_t getPoolSize() const
+    {
         return pool_size;
     }
 
@@ -74,14 +83,15 @@ protected:
     std::tuple<uint32_t, uint64_t, uint64_t *> page_table;
 };
 
-class CPUMemCtl : public MemCtl {
+class CPUMemCtl : public MemCtl
+{
 public:
     ~CPUMemCtl() override;
 
-    static CPUMemCtl *getInstance(size_t pool_size, int hdf_id = 0);
+    static CPUMemCtl *getInstance(size_t pool_size, int hfd_id = 0);
 
 protected:
-    explicit CPUMemCtl(uint64_t size, int hdf_id = 0);
+    explicit CPUMemCtl(uint64_t size, int hfd_id = 0);
 
 public:
     /*
@@ -93,16 +103,16 @@ public:
 
     // For performance reason, mapV2P does not check the ptr's range
     uint64_t mapV2P(void *ptr);
-
 };
 
-class GPUMemCtl : public MemCtl {
+class GPUMemCtl : public MemCtl
+{
 public:
     ~GPUMemCtl() override;
 
     static GPUMemCtl *getInstance(int32_t dev_id, size_t pool_size);
     [[maybe_unused]] static void cleanCtx();
-    
+
 protected:
     explicit GPUMemCtl(uint64_t size);
 
@@ -118,7 +128,6 @@ public:
     void *getMapDevPtr() const;
 
     bool chechPhyContiguous() const;
-
 };
 
 #endif

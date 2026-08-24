@@ -63,19 +63,50 @@ sudo apt autoremove && sudo apt autoclean
 sudo apt install linux-headers-generic
 ```
 
+## Prepare gdrcopy Library
+
+If the machine has not installed our patched gdrcopy, please do the following steps:
+```bash
+git clone git@github.com:RC4ML/gdrcopy.git
+cd gdrcopy
+make
+sudo make install
+sudo ./insmod.sh
+```
+
 ## QDMA Lib Installation
 
 Note: `nvcc` is required in the system PATH.
 
+Important: If `nvcc` is not in the system PATH, **Do not** install it from apt directly. Instead, do as follows:
+   1. Run the following commands:
+   ```bash
+   cd /usr/local
+   ls
+   ```
+   2. You shall see some folders like `cuda-XX.X`, where `XX.X` is the version of the CUDA toolkit.
+   3. Run `nvidia-smi`, you can see the driver's CUDA version of the GPU.
+   4. Choose the proper version of CUDA toolkit. The CUDA versions of the toolkit and the driver don't have to be identical.
+   5. Run the following commands, replace '`XX.X`' with the toolkit version you choose:
+   ```bash
+   export PATH=/usr/local/cuda-XX.X/bin:$PATH
+   export LD_LIBRARY_PATH=/usr/local/cuda-XX.X/lib64:$LD_LIBRARY_PATH
+   ```
+   6. run `nvcc -V`, if you see the version of the CUDA toolkit, then you can go to the next step.
+
+### Lib install
+
 ```bash
-$ cd ~/rc4ml_qdma
-$ mkdir build
-$ cd build
-$ cmake  ..
-$ sudo make install 
+cd ~/rc4ml_qdma
+mkdir build
+cd build
+cmake  ..
+sudo make install 
 ```
 
-There are four binary files you can use:
+If you face compile error `identifier "__builtin_ia32_serialize" is undefined`, it means your NVCC version does not match CUDA version. Then add `-DCMAKE_CUDA_COMPILER=/usr/local/cuda-X.X/bin/nvcc` (please replace X.X with your cuda version) to cmake parameters in order to manually designate your NVCC.
+
+There are five binary files you can use:
 
 ### `qdma_throughput`
 
@@ -109,9 +140,15 @@ GB memory)
 Coressponed to `AXILBenchmarkTop.scala`, which aims to benchmark the AXIL read latency in various situations under
 different workloads.
 
-- `startFpgaH2C(...)` will initialize the host to card channel with a simple throughput benchmark
-- `startFpgaC2H(...)` will initialize the card to host channel with a simple throughput benchmark
-- `axilReadBenchmark(...)` will test the axi lite read latency
+- `startFpgaH2C()` will initialize the host to card channel with a simple throughput benchmark
+- `startFpgaC2H()` will initialize the card to host channel with a simple throughput benchmark
+- `axilReadBenchmark()` will test the axi lite read latency
+
+### `mmio_bridge`
+
+This aims to benchmark mmio performance. Any bitstream with the IP QDMABlackBox is suitable for this.
+
+- `benchmark_bridge_write()` will test mmio write performance in either UC mode or WC mode. Note that the mode is set by adding PAT records on x86 platforms, and Linux kernel doesn't provide an interface to remove PAT records, so after mode switching a reboot is required.
 
 ```diff
 - **Attention!** Before you run these binaries, you must program FPGA and reboot the host. Each time you reboot you need to redo the insmod step (i.e., sudo insmod src/qdma-pf.ko)
@@ -122,16 +159,16 @@ different workloads.
 And following instructions needs to be executed before you run binaries.
 
 ```bash
-$ sudo su
-$ echo 1024 > /sys/bus/pci/devices/0000:1a:00.0/qdma/qmax
-$ dma-ctl qdma1a000 q add idx 0 mode st dir bi
-$ dma-ctl qdma1a000 q start idx 0 dir bi desc_bypass_en pfetch_bypass_en
-$ dma-ctl qdma1a000 q add idx 1 mode st dir bi
-$ dma-ctl qdma1a000 q start idx 1 dir bi desc_bypass_en pfetch_bypass_en
-$ dma-ctl qdma1a000 q add idx 2 mode st dir bi
-$ dma-ctl qdma1a000 q start idx 2 dir bi desc_bypass_en pfetch_bypass_en
-$ dma-ctl qdma1a000 q add idx 3 mode st dir bi
-$ dma-ctl qdma1a000 q start idx 3 dir bi desc_bypass_en pfetch_bypass_en
+sudo su
+echo 1024 > /sys/bus/pci/devices/0000:1a:00.0/qdma/qmax
+dma-ctl qdma1a000 q add idx 0 mode st dir bi
+dma-ctl qdma1a000 q start idx 0 dir bi desc_bypass_en pfetch_bypass_en
+dma-ctl qdma1a000 q add idx 1 mode st dir bi
+dma-ctl qdma1a000 q start idx 1 dir bi desc_bypass_en pfetch_bypass_en
+dma-ctl qdma1a000 q add idx 2 mode st dir bi
+dma-ctl qdma1a000 q start idx 2 dir bi desc_bypass_en pfetch_bypass_en
+dma-ctl qdma1a000 q add idx 3 mode st dir bi
+dma-ctl qdma1a000 q start idx 3 dir bi desc_bypass_en pfetch_bypass_en
 ```
 
 ```diff
