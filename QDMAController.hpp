@@ -22,6 +22,7 @@ public:
     static void disableDebug();
 
 public:
+    int versalInit(uint32_t baseH2cQid=0, uint32_t baseC2hQid=64);
 	void writeConfig(uint32_t index,uint32_t value);
 	uint32_t readConfig(uint32_t index);
 
@@ -42,6 +43,8 @@ private:
 	uint8_t pci_bus;
     size_t bridge_bar_size;
 private:
+    void issueQdmaContext(uint8_t sel, uint8_t op, uint32_t qid);
+    void enableQdmaMask();
     volatile uint32_t *config_bar{};
 	volatile uint32_t *lite_bar{};
 	volatile __m512i *bridge_bar{};
@@ -75,10 +78,10 @@ class CPUMemCtl : public MemCtl {
 public:
     ~CPUMemCtl() override;
 
-    static CPUMemCtl *getInstance(size_t pool_size);
+    static CPUMemCtl *getInstance(size_t pool_size, int hdf_id = 0);
 
 protected:
-    explicit CPUMemCtl(uint64_t size);
+    explicit CPUMemCtl(uint64_t size, int hdf_id = 0);
 
 public:
     /*

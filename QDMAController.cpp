@@ -162,6 +162,238 @@ FPGACtl::~FPGACtl() {
     }
 }
 
+void FPGACtl::issueQdmaContext(uint8_t sel, uint8_t op, uint32_t qid) {
+    uint32_t reg_val = ((sel & 0xf) << 1) | ((op & 0x3) << 5) | ((qid & 0x1fff) << 7);
+    writeConfig(0x844/4, reg_val);
+    // wait until busy bit cleared.
+    int busy;
+    do {
+        busy = readConfig(0x844/4) & 0x1;
+    } while (busy);
+}
+
+void FPGACtl::enableQdmaMask() {
+    for (int i = 0x824; i < 0x844; i += 4) {
+        writeConfig(i/4, 0xffffffff);
+    }
+}
+
+int FPGACtl::versalInit(uint32_t baseH2cQid, uint32_t baseC2hQid) {
+    uint32_t identifier = readConfig(0x0/4);
+    printf("FPGA Identifier: 0x%x\n", identifier);
+
+    identifier = readConfig(0x160/4);
+    printf("Test: 0x%x\n", identifier);
+
+    // Clear error masks.
+
+    uint32_t fatalErrMask = readConfig(0xaf4/4);
+    printf("C2H Streaming Error Mask: 0x%x\n", fatalErrMask);
+    writeConfig(0xaf4/4, 0x0);
+    fatalErrMask = readConfig(0xaf4/4);
+    printf("Cleared C2H Streaming error mask to 0x%x.\n", fatalErrMask);
+
+    fatalErrMask = readConfig(0xafc/4);
+    printf("C2H Streaming Fatal Error Mask: 0x%x\n", fatalErrMask);
+    writeConfig(0xafc/4, 0x0);
+    fatalErrMask = readConfig(0xafc/4);
+    printf("Cleared C2H Streaming fatal error mask to 0x%x.\n", fatalErrMask);
+
+    fatalErrMask = readConfig(0x1054/4);
+    printf("C2H MM Fatal Error Mask: 0x%x\n", fatalErrMask);
+    writeConfig(0x1054/4, 0x0);
+    fatalErrMask = readConfig(0x1054/4);
+    printf("Cleared C2H MM fatal error mask to 0x%x.\n", fatalErrMask);
+
+    // Step 1: Write mask reg to enable all registers.
+
+    enableQdmaMask();
+
+    // Step 2: Write Function MAP (FMAP) table to set maximum number of queues.
+
+    for (int i = 0x804; i < 0x824; i += 4) {
+        if (i == 0x808) {
+            writeConfig(i/4, 1024); // Set maximum 1024 queues.
+        } else {
+            writeConfig(i/4, 0x00000000);
+        }
+    }
+    issueQdmaContext(0xc, 0x1, 0);
+
+    // Step 3: Program host profile
+
+    writeConfig(0x2c8/4, 0x00000000);
+    writeConfig(0x308/4, 0x00000000);
+    // We follow ETHZ to configure this.
+    for (int i = 0x804; i < 0x824; i += 4) {
+        if (i == 0x80c) {
+            writeConfig(i/4, 0x40000000);
+        } else if (i == 0x818) {
+            writeConfig(i/4, 0x00040000);
+        } else {
+            writeConfig(i/4, 0x00000000); 
+        }
+    }
+    issueQdmaContext(0xa, 0x1, 0);
+
+    // Step 5: Enable H2C queues.
+
+    for (int qid = baseH2cQid; qid < baseH2cQid + 64; qid++) {
+
+        // Step 5.1 Clear context reg
+
+        issueQdmaContext(0x0, 0x0, qid);
+        issueQdmaContext(0x1, 0x0, qid);
+        issueQdmaContext(0x2, 0x0, qid);
+        issueQdmaContext(0x3, 0x0, qid);
+        issueQdmaContext(0x4, 0x0, qid);
+        issueQdmaContext(0x5, 0x0, qid);
+
+        // Step 5.2 Create queue
+
+        enableQdmaMask();
+        for (int i = 0x804; i < 0x824; i += 4) {
+            if (i == 0x808) {
+                writeConfig(i/4, 0x00040001);
+            } else {
+                writeConfig(i/4, 0x00000000);
+            }
+        }
+        issueQdmaContext(0x1, 0x1, qid);
+
+        // Step 5.3 Check if the queue is created.
+
+        issueQdmaContext(0x3, 0x2, qid);
+        uint32_t reg_val = readConfig(0x808/4); // Table 13
+        auto idl_stp_b = (reg_val >> 9) & 0x1; // Queue invalid and no descriptors pending.
+        if (!idl_stp_b) {
+            printf("Failed to create queue %d.\n", qid);
+            return -1;
+        } else {
+            // printf("Queue %d created successfully.\n", qid);
+        }
+
+        // Step 5.4 Clear prefetch and completion context
+
+        issueQdmaContext(0x6, 0x0, qid);
+        issueQdmaContext(0x7, 0x0, qid);
+
+        // Step 5.5 Set up completion context
+
+        for (int i = 0x804; i < 0x824; i += 4) {
+            if (i == 0x810) {
+                writeConfig(i/4, 0x10000000);
+            } else if (i == 0x814) {
+                writeConfig(i/4, 0x0); // For H2C.
+            } else {
+                writeConfig(i/4, 0x00000000);
+            }
+        }
+        issueQdmaContext(0x6, 0x1, qid);
+
+    }
+
+    // Step 4: Set maximum C2H data size.
+
+    writeConfig(0xab0/4, 0x1000);
+
+
+    // Step 6: Enable C2H queues (qid 0).
+
+    for (int qid = baseC2hQid; qid < baseC2hQid + 64; qid++) {
+        // Step 6.1 Clear context reg
+        issueQdmaContext(0x0, 0x0, qid);
+        issueQdmaContext(0x1, 0x0, qid);
+        issueQdmaContext(0x2, 0x0, qid);
+        issueQdmaContext(0x3, 0x0, qid);
+        issueQdmaContext(0x4, 0x0, qid);
+        issueQdmaContext(0x5, 0x0, qid);
+
+        // Step 6.2 Create queue
+
+        enableQdmaMask();
+        for (int i = 0x804; i < 0x824; i += 4) {
+            if (i == 0x808) {
+                writeConfig(i/4, 0x00040001);
+            } else {
+                writeConfig(i/4, 0x00000000);
+            }
+        }
+        issueQdmaContext(0x0, 0x1, qid);
+
+        // Step 6.3 Check if the queue is created.
+        issueQdmaContext(0x2, 0x2, qid);
+        uint32_t reg_val = readConfig(0x808/4); // Table 13
+        auto idl_stp_b = (reg_val >> 9) & 0x1; // Queue invalid and no descriptors pending.
+        if (!idl_stp_b) {
+            printf("Failed to create queue %d.\n", qid);
+            return -1;
+        } else {
+            // printf("Queue %d created successfully.\n", qid);
+        }
+
+        // Step 6.4 Clear prefetch and completion context
+
+        issueQdmaContext(0x6, 0x0, qid);
+        issueQdmaContext(0x7, 0x0, qid);
+
+        // Step 6.5 Set up prefetch context
+
+        enableQdmaMask();
+        for (int i = 0x804; i < 0x824; i += 4) {
+            if (i == 0x804) {
+                writeConfig(i/4, 0x00000001); // Bypass=1
+            } else if (i == 0x808) {
+                writeConfig(i/4, 0x00002000); // Valid=1
+            } else {
+                writeConfig(i/4, 0x00000000);
+            }
+        }
+        issueQdmaContext(0x7, 0x1, qid);
+
+        // Step 6.6 Check if the prefetch context is set up.
+
+        issueQdmaContext(0x7, 0x2, qid);
+        uint32_t reg_val2 = readConfig(0x808/4); // Table 13
+        auto valid = (reg_val2 >> 13) & 0x1;
+
+        if (valid) {
+            // printf("Queue %d prefetch context set up successfully.\n", qid);
+        } else {
+            printf("Failed to set up prefetch context for queue %d.\n", qid);
+            return -1;
+        }
+
+        // Step 6.7 Set up completion context
+
+        for (int i = 0x804; i < 0x824; i += 4) {
+            if (i == 0x810) {
+                writeConfig(i/4, 0x10000000);
+            } else if (i == 0x814) {
+                writeConfig(i/4, 0x00040000); // For C2H.
+            } else {
+                writeConfig(i/4, 0x00000000);
+            }
+        }
+        issueQdmaContext(0x6, 0x1, qid);
+    }
+
+    // Step 7: Write prefetch tags to VersalDMAHelper module.
+    
+    writeReg(16, baseC2hQid);
+    for (int qid = baseC2hQid; qid < baseC2hQid + 64; qid++) {
+        writeConfig(0x1408/4, qid);
+        uint32_t tag = readConfig(0x140c/4) & 0x7f;
+        writeReg(18, qid);
+        writeReg(19, tag);
+        writeReg(17, 0);
+        writeReg(17, 1);
+        writeReg(17, 0);
+    }
+
+    return 0;
+}
+
 void FPGACtl::explictInit(uint8_t pci_bus, size_t bridge_bar_size) {
     if(device_list.find(pci_bus)==device_list.end()) {
         auto *tmp = new FPGACtl(pci_bus, bridge_bar_size);
@@ -316,7 +548,7 @@ void MemCtl::free(void *ptr) {
 
 static std::vector<std::shared_ptr<CPUMemCtl>> cpu_mem_ctl_list;
 
-CPUMemCtl::CPUMemCtl(uint64_t size) {
+CPUMemCtl::CPUMemCtl(uint64_t size, int hdf_id) {
     pool_size = size;
 
     int fd, hfd;
@@ -328,7 +560,7 @@ CPUMemCtl::CPUMemCtl(uint64_t size) {
         exit(1);
     }
 
-    std::string hfd_path = fmt::format("/media/huge/hfd");
+    std::string hfd_path = fmt::format("/media/huge/hfd{}", hdf_id);
     if ((hfd = open(hfd_path.c_str(), O_CREAT | O_RDWR | O_SYNC, 0755)) == -1) {
         errorPrint(fmt::format("Open {fn} error, maybe need sudo or you can check whether if {fn} exists",
                                fmt::arg("fn", hfd_path)));
@@ -366,12 +598,12 @@ CPUMemCtl::~CPUMemCtl() {
     delete[] parray;
 }
 
-CPUMemCtl *CPUMemCtl::getInstance(size_t pool_size) {
+CPUMemCtl *CPUMemCtl::getInstance(size_t pool_size, int hdf_id) { // hdf_id is used when multiple processes need to allocate their own CPU memory pool.
     // up round to 2MB
     pool_size = (pool_size + 2UL * 1024 * 1024 - 1) & ~(2UL * 1024 * 1024 - 1);
 
     if (cpu_mem_ctl_list.empty()) {
-        auto tmp = new CPUMemCtl(pool_size);
+        auto tmp = new CPUMemCtl(pool_size, hdf_id);
         cpu_mem_ctl_list.push_back(std::shared_ptr<CPUMemCtl>(tmp));
         return tmp;
     } else {

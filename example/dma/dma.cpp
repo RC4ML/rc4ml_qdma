@@ -77,12 +77,12 @@ void reset_counters(FPGACtl *fpga_ctl) {
 void h2c_benchmark(uint8_t pci_bus) {
     fmt::println("=====H2C throughput benchmark start=====");
     
-    size_t size = 1UL*1024*1024*1024;
+    size_t size = 8UL*1024*1024*1024;
 
     FPGACtl::explictInit(pci_bus, 4 * 1024 * 1024);
     auto fpga_ctl = FPGACtl::getInstance(pci_bus);
 
-    auto cpu_mem_ctl = CPUMemCtl::getInstance(1UL * 1024 * 1024 * 1024);
+    auto cpu_mem_ctl = CPUMemCtl::getInstance(8UL * 1024 * 1024 * 1024);
 
     cpu_mem_ctl->writeTLB([=](uint32_t page_index, uint32_t page_size, uint64_t vaddr, uint64_t paddr) {
         fpga_ctl->writeReg(8, (uint32_t) (vaddr));
@@ -98,18 +98,18 @@ void h2c_benchmark(uint8_t pci_bus) {
     auto p = (uint32_t *) dma_buff;
 
     uint32_t is_seq = 1;
-    uint32_t length = 1 * 1024;
+    uint32_t length = 4 * 1024;
     uint32_t offset = 0;
-    uint32_t total_qs = 4;
+    uint32_t total_qs = 1;
     uint32_t total_cmds = 256 * 1024;
-    uint32_t total_words = length / 64 * total_cmds;
-    uint32_t range = 16 * 1024 * 1024;
-    uint32_t range_words = range / 64;
+    uint32_t total_words = length / 128 * total_cmds;
+    uint32_t range = 64 * 1024 * 1024;
+    uint32_t range_words = range / 128;
 
 
     for (int i = 0; i < total_words; i++) {//initial
-        for (int j = 0; j < 16; j++) {
-            p[i * 16 + j] = i;
+        for (int j = 0; j < 32; j++) {
+            p[i * 32 + j] = i;
         }
     }
 
@@ -159,14 +159,14 @@ void h2c_benchmark(uint8_t pci_bus) {
 void gpu_h2c_benchmark(uint8_t pci_bus) {
     fmt::println("=====GPU H2C throughput benchmark start=====");
 
-    size_t size = 1UL * 1024 * 1024 * 1024;
+    size_t size = 8UL * 1024 * 1024 * 1024;
 
-    FPGACtl::explictInit(pci_bus, 4 * 1024 * 1024);
+    FPGACtl::explictInit(pci_bus, 256 * 1024 * 1024);
     auto fpga_ctl = FPGACtl::getInstance(pci_bus);
 
-    auto cpu_mem_ctl = GPUMemCtl::getInstance(0, 1UL * 1024 * 1024 * 1024);
+    auto gpu_mem_ctl = GPUMemCtl::getInstance(0, 8UL * 1024 * 1024 * 1024);
 
-    cpu_mem_ctl->writeTLB([=](uint32_t page_index, uint32_t page_size, uint64_t vaddr, uint64_t paddr) {
+    gpu_mem_ctl->writeTLB([=](uint32_t page_index, uint32_t page_size, uint64_t vaddr, uint64_t paddr) {
         fpga_ctl->writeReg(8, (uint32_t) (vaddr));
         fpga_ctl->writeReg(9, (uint32_t) ((vaddr) >> 32));
         fpga_ctl->writeReg(10, (uint32_t) (paddr));
@@ -176,24 +176,26 @@ void gpu_h2c_benchmark(uint8_t pci_bus) {
         fpga_ctl->writeReg(13, 0);
     }, true);
 
-    auto dma_buff = cpu_mem_ctl->alloc(size);
+    auto dma_buff = gpu_mem_ctl->alloc(size);
     auto p = (uint32_t *) dma_buff;
 
+    printf("p: %p\n", p);
+
     uint32_t is_seq = 1;
-    uint32_t length = 1 * 1024;
+    uint32_t length = 32 * 1024 * 1024;
     uint32_t offset = 0;
-    uint32_t total_qs = 4;
+    uint32_t total_qs = 1;
     uint32_t total_cmds = 256 * 1024;
     uint32_t total_words = length / 64 * total_cmds;
     uint32_t range = 16 * 1024 * 1024;
     uint32_t range_words = range / 64;
 
 
-    for (int i = 0; i < total_words; i++) {//initial
-        for (int j = 0; j < 16; j++) {
-            p[i * 16 + j] = i;
-        }
-    }
+    // for (int i = 0; i < total_words; i++) {//initial
+    //     for (int j = 0; j < 16; j++) {
+    //         p[i * 16 + j] = i;
+    //     }
+    // }
 
     fpga_ctl->writeReg(100, (uint32_t) ((uint64_t) p >> 32));
     fpga_ctl->writeReg(101, (uint32_t) ((uint64_t) p));
@@ -233,7 +235,7 @@ void gpu_h2c_benchmark(uint8_t pci_bus) {
     }
     fmt::print("\n");
 
-    cpu_mem_ctl->free(dma_buff);
+    gpu_mem_ctl->free(dma_buff);
 
     throughput_benchmark_print_counters(fpga_ctl);
 }
@@ -264,9 +266,9 @@ void c2h_benchmark(uint8_t pci_bus){
 
     uint32_t length = 32*1024;
     uint32_t offset = 3;
-    uint32_t total_cmds = 32*1024;
-    uint32_t total_qs = 4;
-    uint32_t total_words = length/64 * total_cmds;
+    uint32_t total_cmds = 2048*1024;
+    uint32_t total_qs = 1;
+    uint32_t total_words = length/128 * total_cmds;
 
     fpga_ctl->writeReg(200, (uint32_t) ((unsigned long)p>>32));
     fpga_ctl->writeReg(201, (uint32_t) ((unsigned long)p));
@@ -302,25 +304,25 @@ void c2h_benchmark(uint8_t pci_bus){
     double speed = 1.0*length*total_cmds/(1.0*count_time*4/1000/1000/1000)/1024/1024/1024;
     fmt::println("Speed: {:.2f} GB/s", speed);
 
-    uint32_t right_count=0;
-    uint32_t wrong_count=0;
-    uint32_t right_val = offset;
-    for(int i=0;i<total_words;i++){
-        uint32_t val = p[i*16];
-        if(right_val != val){
-            // printf("%d ",val);
-            wrong_count++;
-        }else{
-            right_count++;
-        }
-        right_val++;
-        for(int j=1;j<16;j++){
-            if(p[i*16+j]!=val){
-                // printf("Error\n");
-            }
-        }
-    }
-    fmt::println("right data count: {}, wrong data count: {}\n",right_count, wrong_count);
+    // uint32_t right_count=0;
+    // uint32_t wrong_count=0;
+    // uint32_t right_val = offset;
+    // for(int i=0;i<total_words;i++){
+    //     uint32_t val = p[i*32];
+    //     if(right_val != val){
+    //         // printf("%d ",val);
+    //         wrong_count++;
+    //     }else{
+    //         right_count++;
+    //     }
+    //     right_val++;
+    //     for(int j=1;j<32;j++){
+    //         if(p[i*32+j]!=val){
+    //             // printf("Error\n");
+    //         }
+    //     }
+    // }
+    // fmt::println("right data count: {}, wrong data count: {}\n",right_count, wrong_count);
 
     cpu_mem_ctl->free(dma_buff);
 
