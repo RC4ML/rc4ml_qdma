@@ -2,6 +2,7 @@
 #include "QDMAController.hpp"
 
 #include <map>
+#include <cstdlib>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -44,9 +45,10 @@
         CUresult result = (stmt);                           \
         if (result != CUDA_SUCCESS)                         \
         {                                                   \
-            const char *_err_name;                          \
+                const char *_err_name = nullptr;                \
             cuGetErrorName(result, &_err_name);             \
-            fprintf(stderr, "CUDA error: %s\n", _err_name); \
+                fprintf(stderr, "CUDA error: %d (%s)\n", static_cast<int>(result), \
+                    _err_name ? _err_name : "name unavailable"); \
         }                                                   \
         ASSERT(CUDA_SUCCESS == result);                     \
     } while (0)
@@ -968,6 +970,12 @@ GPUMemCtl *GPUMemCtl::getInstance([[maybe_unused]] int32_t dev_id, [[maybe_unuse
         devID = dev_id;
         auto tmp = new GPUMemCtl(pool_size);
         gpu_mem_ctl_list.push_back(std::shared_ptr<GPUMemCtl>(tmp));
+        if (std::atexit(&GPUMemCtl::cleanCtx) != 0)
+        {
+            GPUMemCtl::cleanCtx();
+            errorPrint("Failed to register GPU memory pool cleanup");
+            std::exit(EXIT_FAILURE);
+        }
         return tmp;
     }
     else
